@@ -33,14 +33,17 @@ class ResumeProcessingService:
             result = run_resume_graph(resume.extracted_text)
 
         except Exception as exc:
+            raise RuntimeError(
+                f"Resume AI processing failed: {str(exc)}"
+            ) from exc
 
-            return Response(
-                {
-                    "error": "Resume processing failed.",
-                    "details": str(exc)
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            # return Response(
+            #     {
+            #         "error": "Resume processing failed.",
+            #         "details": str(exc)
+            #     },
+            #     status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            # )
 
         # Step 3: Get graph results
         

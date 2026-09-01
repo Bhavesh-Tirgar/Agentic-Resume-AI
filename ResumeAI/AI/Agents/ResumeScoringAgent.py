@@ -5,7 +5,7 @@ from AI.Services.GeminiService import GeminiService
 
 
 from AI.Prompts.ResumeScoringPrompt import RESUME_SCORING_PROMPT
-
+from AI.Utils.TokenCounter import TokenCounter
 from AI.Schemas.ResumeSchema import ResumeSchema
 from AI.Schemas.AnalysisSchema import AnalysisSchema
 from AI.Schemas.ResumeScoreSchema import ResumeScoreSchema
@@ -65,7 +65,8 @@ class ResumeScoringAgent:
             )
 
         try:
-
+            token_counter = TokenCounter(agent_name="ResumeScoringAgent")
+            
             result = self.chain.invoke(
                 {
                     "resume": resume.model_dump_json(
@@ -74,6 +75,9 @@ class ResumeScoringAgent:
                     "analysis": analysis.model_dump_json(
                         indent=2
                     )
+                },
+                config={
+                    "callbacks": [token_counter]
                 }
             )
 

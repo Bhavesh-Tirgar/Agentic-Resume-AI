@@ -2,7 +2,7 @@ import logging
 
 from AI.Services.GeminiService import GeminiService
 from langchain_core.prompts import ChatPromptTemplate
-
+from AI.Utils.TokenCounter import TokenCounter
 from AI.Schemas.ResumeSchema import ResumeSchema
 from AI.Schemas.JobMatchSchema import JobMatchSchema
 from AI.Prompts.JobMatchingPrompt import JOB_MATCHING_PROMPT
@@ -53,13 +53,17 @@ class JobMatchingAgent:
             raise ValueError("Job title cannot be empty.")
 
         try:
+            token_counter = TokenCounter(agent_name="JobMatchingAgent")
 
             result = self.chain.invoke(
                 {
                     "resume": resume.model_dump_json(indent=2),
                     "job_title": job_title,
                     "job_description": (job_description.strip() if job_description else ""),
-                }
+                },
+                config={
+                        "callbacks": [token_counter]
+                        }
             )
 
             return result

@@ -1,5 +1,5 @@
 from langchain_core.prompts import ChatPromptTemplate
-
+from AI.Utils.TokenCounter import TokenCounter
 from AI.Services.GeminiService import GeminiService
 from AI.Prompts.ResumeParserPrompt import RESUME_PARSER_PROMPT
 from AI.Schemas.ResumeSchema import ResumeSchema
@@ -46,11 +46,15 @@ class ResumeParserAgent:
         Parse raw resume text and return a validated
         ResumeSchema object.
         """
+        token_counter = TokenCounter(agent_name="ResumeParserAgent")
 
         result = self.chain.invoke(
             {
                 "resume_text": resume_text
-            }
+            },
+            config={
+                    "callbacks": [token_counter]
+                    }
         )
 
         return result

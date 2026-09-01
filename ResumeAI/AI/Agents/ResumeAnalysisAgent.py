@@ -1,4 +1,5 @@
 from langchain_core.prompts import ChatPromptTemplate
+from AI.Utils.TokenCounter import TokenCounter
 
 from AI.Services.GeminiService import GeminiService
 from AI.Prompts.ResumeAnalysisPrompt import RESUME_ANALYSIS_PROMPT
@@ -60,13 +61,19 @@ class ResumeAnalysisAgent:
             raise ValueError(
                 "Resume cannot be None."
             )
+        
+        token_counter = TokenCounter(agent_name="ResumeAnalysisAgent")
 
         result = self.chain.invoke(
             {
                 "resume": resume.model_dump_json(
                     indent=2
                 )
-            }
+            },
+            config={
+                    "callbacks": [token_counter]
+                    }
+
         )
 
         return result

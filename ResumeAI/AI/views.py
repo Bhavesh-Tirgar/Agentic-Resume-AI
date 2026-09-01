@@ -9,6 +9,7 @@ from Resume.models import Resume
 
 from AI.Services.ResumeProcessService import ResumeProcessingService
 from AI.Services.JobMatchingService import JobMatchingService
+from AI.Services.InterviewPlanningService import InterviewPlanningService
 
 
 class ResumeProcessView(APIView):
@@ -120,6 +121,67 @@ class JobMatchingView(APIView):
                 "message": "Job matching completed successfully.",
                 "job_match_id": result.id,
                 "match_data": result.match_data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class InterviewPlanningView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, resume_id, job_match_id):
+
+        # ---------------------------------------
+        # Step 1: Get user's resume
+        # ---------------------------------------
+
+        resume = get_object_or_404(
+            Resume,
+            id=resume_id,
+            user=request.user
+        )
+
+        # ---------------------------------------
+        # Step 2: Run interview planning service
+        # ---------------------------------------
+
+        try:
+
+            result = InterviewPlanningService.create_plan(
+                resume=resume,
+                job_match_id=job_match_id
+            )
+
+        except ValueError as exc:
+
+            return Response(
+                {
+                    "error": str(exc)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        except RuntimeError as exc:
+
+            return Response(
+                {
+                    "error": str(exc)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # ---------------------------------------
+        # Step 3: Return interview plan
+        # ---------------------------------------
+
+        return Response(
+            {
+                "message": "Interview plan created successfully.",
+
+                "interview_plan_id": result.id,
+
+                "plan_data": result.plan_data
             },
             status=status.HTTP_200_OK
         )
