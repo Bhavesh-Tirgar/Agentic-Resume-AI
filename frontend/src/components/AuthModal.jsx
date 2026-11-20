@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Lock, Mail, User, Sparkles, AlertCircle, Loader2 } from "lucide-react";
+import { X, Lock, Mail, User, AlertCircle, Loader2 } from "lucide-react";
 import { api } from "../api";
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
@@ -32,104 +32,92 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-      <div className="relative w-full max-w-md rounded-2xl glass-panel p-6 sm:p-8 border border-white/10 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+      <div className="relative w-full max-w-sm rounded-xl bg-[#12151c] p-6 border border-[#222736] shadow-2xl">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition"
+          className="absolute top-4 right-4 p-1 rounded-md hover:bg-[#1a1f29] text-[#8c96a8] hover:text-white transition"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 mb-3">
-            <Lock className="w-6 h-6 text-emerald-400" />
-          </div>
-          <h3 className="text-lg font-bold text-white">
-            {isRegister ? "Create Your Account" : "Welcome Back"}
-          </h3>
-          <p className="text-xs text-slate-400 mt-1">
-            Access your secure multi-agent resume audits and interview plans
+        <div className="mb-5">
+          <h2 className="text-base font-bold text-white tracking-tight">
+            {isRegister ? "Create Developer Account" : "Authenticate Session"}
+          </h2>
+          <p className="text-xs text-[#8c96a8] mt-1">
+            Access protected resume operations and persistence.
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 flex items-center gap-2 p-2.5 rounded-xl bg-rose-950/30 border border-rose-900/50 text-rose-400 text-xs">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <div className="mb-4 flex items-center gap-2 p-2.5 rounded-md bg-rose-950/40 border border-rose-900/50 text-rose-300 text-xs">
+            <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           <div>
-            <label className="text-xs font-medium text-slate-300 block mb-1">Username</label>
+            <label className="text-[#8c96a8] block mb-1">Username</label>
             <div className="relative">
-              <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-[#0b0e18] border border-white/10 text-white focus:outline-none focus:border-indigo-500 transition-colors"
-                placeholder="Enter your username"
+                className="w-full pl-8 pr-3 py-2 rounded-md bg-[#0d0f14] border border-[#202532] text-white focus:outline-none focus:border-[#3d465c] transition font-mono"
               />
+              <User className="w-3.5 h-3.5 text-[#6b7585] absolute left-2.5 top-2.5" />
             </div>
           </div>
 
           {isRegister && (
             <div>
-              <label className="text-xs font-medium text-slate-300 block mb-1">Email</label>
+              <label className="text-[#8c96a8] block mb-1">Email</label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-[#0b0e18] border border-white/10 text-white focus:outline-none focus:border-indigo-500 transition-colors"
-                  placeholder="name@example.com"
+                  className="w-full pl-8 pr-3 py-2 rounded-md bg-[#0d0f14] border border-[#202532] text-white focus:outline-none focus:border-[#3d465c] transition font-mono"
                 />
+                <Mail className="w-3.5 h-3.5 text-[#6b7585] absolute left-2.5 top-2.5" />
               </div>
             </div>
           )}
 
           <div>
-            <label className="text-xs font-medium text-slate-300 block mb-1">Password</label>
+            <label className="text-[#8c96a8] block mb-1">Password</label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-[#0b0e18] border border-white/10 text-white focus:outline-none focus:border-indigo-500 transition-colors"
-                placeholder="••••••••"
+                className="w-full pl-8 pr-3 py-2 rounded-md bg-[#0d0f14] border border-[#202532] text-white focus:outline-none focus:border-[#3d465c] transition font-mono"
               />
+              <Lock className="w-3.5 h-3.5 text-[#6b7585] absolute left-2.5 top-2.5" />
             </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full py-2.5 px-4 mt-2 rounded-md bg-white text-black font-semibold text-xs hover:bg-[#e4e7eb] transition cursor-pointer disabled:opacity-50"
           >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <span>{isRegister ? "Sign Up" : "Sign In"}</span>
-            )}
+            {loading ? "Authenticating..." : isRegister ? "Create Account" : "Sign In with JWT"}
           </button>
         </form>
 
-        <div className="mt-5 text-center">
+        <div className="mt-4 pt-3 border-t border-[#1d222e] text-center text-xs text-[#8c96a8]">
+          <span>{isRegister ? "Already have an account?" : "Need an account?"}</span>{" "}
           <button
-            onClick={() => {
-              setIsRegister(!isRegister);
-              setError("");
-            }}
-            className="text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer"
+            onClick={() => setIsRegister(!isRegister)}
+            className="text-white hover:underline font-medium cursor-pointer"
           >
-            {isRegister ? "Already have an account? Sign In" : "Don't have an account? Create one"}
+            {isRegister ? "Sign In" : "Register"}
           </button>
         </div>
       </div>

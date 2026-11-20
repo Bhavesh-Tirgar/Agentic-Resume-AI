@@ -1,67 +1,66 @@
 import React from "react";
-import { Sparkles, FileText, Briefcase, HelpCircle, ShieldCheck, LogIn, LogOut, CheckCircle2 } from "lucide-react";
+import { FileText, Target, HelpCircle, Upload, LogIn, LogOut, CheckCircle2, ChevronRight } from "lucide-react";
 
 export default function Navbar({ activeTab, setActiveTab, user, onAuthClick, onLogout }) {
-  const navItems = [
-    { id: "overview", label: "Overview & Upload", icon: FileText },
-    { id: "analyzer", label: "ATS & Recruiter Audit", icon: Sparkles },
-    { id: "matcher", label: "Job Description Match", icon: Briefcase },
-    { id: "interview", label: "Interview Simulator", icon: HelpCircle },
+  const navTabs = [
+    { id: "audit", label: "Audit Dossier", icon: FileText },
+    { id: "matcher", label: "Job Matcher", icon: Target },
+    { id: "interview", label: "Interview Studio", icon: HelpCircle },
+    { id: "upload", label: "Upload & Ingest", icon: Upload },
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full glass-panel border-b border-white/5 backdrop-blur-xl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Brand Logo */}
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab("overview")}>
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 p-[1px] shadow-lg shadow-indigo-500/20">
-            <div className="w-full h-full bg-[#0a0d16] rounded-xl flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-emerald-400" />
-            </div>
+    <header className="sticky top-0 z-50 w-full bg-[#0d0f14] border-b border-[#1c212c]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+        {/* Brand */}
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab("audit")}>
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-black font-bold text-sm tracking-tight shadow-sm">
+            RA
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-bold tracking-tight text-white">Agentic<span className="text-indigo-400">Resume</span></span>
-              <span className="px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full">AI 2.0</span>
-            </div>
-            <p className="text-[11px] text-slate-400 hidden sm:block">Multi-Agent ATS Engine & Career Copilot</p>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-white tracking-tight">ResumeStudio</span>
+            <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[#181d26] text-[#8c96a8] border border-[#232936]">v2.4</span>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="hidden md:flex items-center gap-1 bg-[#101422] p-1 rounded-xl border border-white/5">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
+        {/* Center Nav Segmented Control */}
+        <nav className="hidden md:flex items-center gap-1 bg-[#13161d] p-1 rounded-lg border border-[#1f2430]">
+          {navTabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
             return (
               <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   isActive
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-semibold"
-                    : "text-slate-400 hover:text-white hover:bg-white/5"
+                    ? "bg-[#222836] text-white shadow-sm font-semibold"
+                    : "text-[#8c96a8] hover:text-white hover:bg-[#1a1f29]"
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? "text-emerald-300" : "text-slate-400"}`} />
-                {item.label}
+                <Icon className={`w-3.5 h-3.5 ${isActive ? "text-emerald-400" : "text-[#6b7585]"}`} />
+                <span>{tab.label}</span>
               </button>
             );
           })}
         </nav>
 
-        {/* User / Auth Status */}
+        {/* Right Status & Profile */}
         <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#13161e] border border-[#1d222e] text-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span className="text-[#8c96a8] truncate max-w-[140px]">Bhavesh_Tirgar.pdf</span>
+          </div>
+
           {user ? (
-            <div className="flex items-center gap-2 pl-3 pr-2 py-1 bg-[#14192a] rounded-xl border border-white/10">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                <span className="text-xs font-medium text-slate-200">{user.username || "Bhavesh"}</span>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-white px-2 py-1 rounded bg-[#181d26] border border-[#232936]">
+                {user.username || "Bhavesh"}
+              </span>
               <button
                 onClick={onLogout}
                 title="Sign Out"
-                className="p-1 hover:bg-white/10 rounded-lg text-slate-400 hover:text-rose-400 transition"
+                className="p-1.5 rounded hover:bg-[#1f2432] text-[#8c96a8] hover:text-rose-400 transition"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>
@@ -69,10 +68,10 @@ export default function Navbar({ activeTab, setActiveTab, user, onAuthClick, onL
           ) : (
             <button
               onClick={onAuthClick}
-              className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-white text-black hover:bg-neutral-200 transition"
             >
               <LogIn className="w-3.5 h-3.5" />
-              Sign In
+              <span>Sign In</span>
             </button>
           )}
         </div>

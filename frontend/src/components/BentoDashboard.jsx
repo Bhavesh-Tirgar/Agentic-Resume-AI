@@ -1,307 +1,337 @@
 import React, { useState } from "react";
 import { 
-  Sparkles, Award, CheckCircle, AlertTriangle, TrendingUp, Lightbulb, 
-  Briefcase, GraduationCap, Code, ArrowRight, Zap, Target, BookmarkCheck
+  CheckCircle2, AlertTriangle, ArrowRight, Copy, Check, 
+  Target, HelpCircle, Layers, TrendingUp, Sparkles, Building2, Calendar, MapPin
 } from "lucide-react";
 
 export default function BentoDashboard({ results, onNavigateToMatch, onNavigateToInterview }) {
-  const [activeAnalysisTab, setActiveAnalysisTab] = useState("strengths");
-  const [selectedSkillFilter, setSelectedSkillFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("rewrites"); // rewrites, gaps, strengths
+  const [copiedIndex, setCopiedIndex] = useState(null);
 
   const { score_data, analysis_data, parsed_data } = results;
-  const overallScore = score_data?.overall_score || 85;
 
-  // Helper for score color
-  const getScoreColor = (score) => {
-    if (score >= 85) return { stroke: "#10b981", text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" };
-    if (score >= 70) return { stroke: "#6366f1", text: "text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/20" };
-    return { stroke: "#f59e0b", text: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" };
+  const handleCopy = (text, index) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const scoreTheme = getScoreColor(overallScore);
-
-  // Circular progress calculations
-  const radius = 54;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (overallScore / 100) * circumference;
-
   return (
-    <div className="w-full max-w-7xl mx-auto py-6 space-y-6">
-      {/* Top Action Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-2xl glass-panel">
+    <div className="w-full max-w-7xl mx-auto py-2 space-y-6">
+      {/* Dossier Header Bar */}
+      <div className="surface-card p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Analysis Completed</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-            <span className="text-xs text-slate-400">Candidate: <strong className="text-white">{parsed_data?.name || "Bhavesh Tirgar"}</strong></span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span className="text-xs font-mono uppercase tracking-wider text-[#8c96a8]">Audited Technical Dossier</span>
           </div>
-          <h2 className="text-xl font-bold text-white mt-0.5">Executive ATS & Skills Intelligence</h2>
+          <h1 className="text-xl font-bold text-white mt-1">
+            {parsed_data?.name || "Bhavesh Tirgar"}
+          </h1>
+          <p className="text-xs text-[#8c96a8] mt-0.5">
+            {parsed_data?.title || "Senior Full Stack & AI Systems Engineer"} • {parsed_data?.location}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2.5 w-full md:w-auto">
           <button
             onClick={onNavigateToMatch}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+            className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg bg-white text-black hover:bg-[#e4e7eb] transition cursor-pointer"
           >
-            <Target className="w-3.5 h-3.5 text-emerald-300" />
-            <span>Match with Job Description</span>
+            <Target className="w-3.5 h-3.5" />
+            <span>Match Against Job Description</span>
           </button>
           <button
             onClick={onNavigateToInterview}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition-all cursor-pointer"
+            className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg bg-[#191d27] text-white hover:bg-[#232936] border border-[#262c3b] transition cursor-pointer"
           >
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>Interview Prep Simulator</span>
+            <HelpCircle className="w-3.5 h-3.5 text-[#8c96a8]" />
+            <span>Interview Prep</span>
           </button>
         </div>
       </div>
 
-      {/* Bento Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Main 2-Column Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* Card 1: Master ATS Score Gauge (Hero 4 Cols) */}
-        <div className="lg:col-span-4 rounded-2xl glass-panel p-6 flex flex-col justify-between glass-panel-hover">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Overall ATS Readiness</span>
-              <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full border ${scoreTheme.bg} ${scoreTheme.text} ${scoreTheme.border}`}>
-                Grade {score_data?.grade || "A"} • Top 5%
-              </span>
-            </div>
+        {/* Left Column: Parsed Candidate Dossier (7 Cols) */}
+        <div className="lg:col-span-7 space-y-6">
+          
+          {/* Skills Breakdown by Taxonomy */}
+          <div className="surface-card p-5">
+            <h2 className="text-xs font-semibold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Layers className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Extracted Technical Competencies</span>
+            </h2>
 
-            {/* Circular Gauge */}
-            <div className="flex items-center justify-center py-4">
-              <div className="relative w-36 h-36 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 128 128">
-                  <circle
-                    cx="64"
-                    cy="64"
-                    r={radius}
-                    stroke="#1e2538"
-                    strokeWidth="10"
-                    fill="transparent"
-                  />
-                  <circle
-                    cx="64"
-                    cy="64"
-                    r={radius}
-                    stroke={scoreTheme.stroke}
-                    strokeWidth="10"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    strokeLinecap="round"
-                    fill="transparent"
-                    className="transition-all duration-1000 ease-out"
-                  />
-                </svg>
-                <div className="absolute flex flex-col items-center justify-center text-center">
-                  <span className="text-4xl font-extrabold text-white tracking-tight">{overallScore}</span>
-                  <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">/ 100 PTS</span>
+            <div className="space-y-3 text-xs">
+              <div>
+                <span className="text-[#6b7585] text-[11px] uppercase font-mono block mb-1.5">Languages & Core</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {parsed_data?.skills?.languages?.map((s, i) => (
+                    <span key={i} className="px-2.5 py-1 rounded bg-[#171b24] border border-[#232936] text-[#c4ccd9] font-mono text-[11px]">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[#6b7585] text-[11px] uppercase font-mono block mb-1.5">Frameworks & Agentic AI</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {parsed_data?.skills?.frameworks?.map((s, i) => (
+                    <span key={i} className="px-2.5 py-1 rounded bg-[#171b24] border border-[#232936] text-[#c4ccd9] font-mono text-[11px]">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[#6b7585] text-[11px] uppercase font-mono block mb-1.5">Database & Infrastructure</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[...(parsed_data?.skills?.databases || []), ...(parsed_data?.skills?.tools_devops || [])].map((s, i) => (
+                    <span key={i} className="px-2.5 py-1 rounded bg-[#171b24] border border-[#232936] text-[#c4ccd9] font-mono text-[11px]">
+                      {s}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
-
-            {/* Recruiter Summary */}
-            <p className="text-xs text-slate-300 leading-relaxed mt-2 bg-black/20 p-3 rounded-xl border border-white/5">
-              "{score_data?.summary}"
-            </p>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
-            <span className="flex items-center gap-1.5"><BookmarkCheck className="w-3.5 h-3.5 text-emerald-400" /> ATS Parsable</span>
-            <span className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Multi-Agent Audited</span>
-          </div>
-        </div>
+          {/* Experience Timeline with In-line Audit Flags */}
+          <div className="surface-card p-5">
+            <h2 className="text-xs font-semibold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Experience & Bullet Audit</span>
+            </h2>
 
-        {/* Card 2: ATS Sub-Categories Breakdown (8 Cols) */}
-        <div className="lg:col-span-8 rounded-2xl glass-panel p-6 glass-panel-hover flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Metric Breakdown Matrix</h3>
-              <span className="text-xs text-slate-400">Audited against 4,000+ top ATS screening filters</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {score_data?.categories?.map((cat, idx) => (
-                <div key={idx} className="p-3.5 rounded-xl bg-[#0f1320] border border-white/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-200">{cat.name}</span>
-                    <span className="text-xs font-bold text-emerald-400">{cat.score}%</span>
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full transition-all duration-700"
-                      style={{ width: `${cat.score}%` }}
-                    ></div>
-                  </div>
-
-                  <p className="text-[11px] text-slate-400 leading-snug">{cat.feedback}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
-            <span>Machine-readable format detected</span>
-            <span className="text-emerald-400 font-medium">99.4% Parsing Confidence</span>
-          </div>
-        </div>
-
-        {/* Card 3: Executive Recruiter Qualitative Audit (7 Cols) */}
-        <div className="lg:col-span-7 rounded-2xl glass-panel p-6 glass-panel-hover">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Recruiter Qualitative Review</h3>
-            
-            {/* Filter Pills */}
-            <div className="flex items-center gap-1 bg-[#101422] p-1 rounded-xl border border-white/5">
-              {[
-                { id: "strengths", label: "Strengths" },
-                { id: "weaknesses", label: "Gaps" },
-                { id: "improvements", label: "Action Items" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveAnalysisTab(tab.id)}
-                  className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-all ${
-                    activeAnalysisTab === tab.id
-                      ? "bg-indigo-600 text-white font-semibold shadow-sm"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Tab Content */}
-          <div className="space-y-2.5 min-h-[180px]">
-            {activeAnalysisTab === "strengths" && (
-              analysis_data?.strengths?.map((item, idx) => (
-                <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-xs text-emerald-200">
-                  <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span className="leading-relaxed">{item}</span>
-                </div>
-              ))
-            )}
-
-            {activeAnalysisTab === "weaknesses" && (
-              analysis_data?.weaknesses?.map((item, idx) => (
-                <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-amber-950/20 border border-amber-500/20 text-xs text-amber-200">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                  <span className="leading-relaxed">{item}</span>
-                </div>
-              ))
-            )}
-
-            {activeAnalysisTab === "improvements" && (
-              analysis_data?.improvements?.map((item, idx) => (
-                <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-indigo-950/20 border border-indigo-500/20 text-xs text-indigo-200">
-                  <Lightbulb className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
-                  <span className="leading-relaxed">{item}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Card 4: Verified Skills Architecture (5 Cols) */}
-        <div className="lg:col-span-5 rounded-2xl glass-panel p-6 glass-panel-hover flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Identified Skill Stack</h3>
-              <span className="text-xs font-semibold text-emerald-400">{parsed_data?.skills?.length || 0} Skills</span>
-            </div>
-
-            <p className="text-xs text-slate-400 mb-4">Extracted & categorized from parsed work experience and technical projects.</p>
-
-            {/* Badges Cloud */}
-            <div className="flex flex-wrap gap-2 max-h-[180px] overflow-y-auto pr-1">
-              {parsed_data?.skills?.map((skill, idx) => (
-                <span
-                  key={idx}
-                  className="px-3 py-1 text-xs font-medium rounded-lg bg-[#14192b] border border-white/10 text-slate-200 hover:border-indigo-500/50 hover:text-white transition-colors"
-                >
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
-            <span>High keyword density</span>
-            <span className="text-indigo-400">Ready for Job Matching</span>
-          </div>
-        </div>
-
-        {/* Card 5: Parsed Experience & Education Timeline (12 Cols) */}
-        <div className="lg:col-span-12 rounded-2xl glass-panel p-6 glass-panel-hover">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Parsed Candidate Profile</h3>
-            <span className="text-xs text-slate-400">Extracted by ResumeParserAgent</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Experience */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-indigo-400 uppercase tracking-wider">
-                <Briefcase className="w-3.5 h-3.5" />
-                <span>Experience</span>
-              </div>
+            <div className="space-y-6">
               {parsed_data?.experience?.map((exp, idx) => (
-                <div key={idx} className="p-3.5 rounded-xl bg-[#0f1320] border border-white/5 space-y-1">
-                  <div className="text-xs font-bold text-white">{exp.role}</div>
-                  <div className="text-[11px] text-slate-400">{exp.organization} • {exp.duration}</div>
-                  <div className="text-xs text-slate-300 mt-1 leading-relaxed">{exp.description}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Projects */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 uppercase tracking-wider">
-                <Code className="w-3.5 h-3.5" />
-                <span>Projects</span>
-              </div>
-              {parsed_data?.projects?.map((proj, idx) => (
-                <div key={idx} className="p-3.5 rounded-xl bg-[#0f1320] border border-white/5 space-y-1">
-                  <div className="text-xs font-bold text-white">{proj.name}</div>
-                  <div className="text-xs text-slate-300 leading-relaxed">{proj.description}</div>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {proj.technologies?.map((tech, tIdx) => (
-                      <span key={tIdx} className="px-1.5 py-0.5 text-[10px] bg-indigo-950/40 text-indigo-300 rounded border border-indigo-900/40">
-                        {tech}
-                      </span>
-                    ))}
+                <div key={idx} className="pb-6 border-b border-[#1b1f2b] last:border-b-0 last:pb-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">{exp.role}</h3>
+                      <p className="text-xs text-[#8c96a8]">{exp.organization} • {exp.location}</p>
+                    </div>
+                    <span className="text-[11px] font-mono text-[#6b7585] bg-[#151922] px-2 py-0.5 rounded border border-[#202533] self-start sm:self-auto">
+                      {exp.duration}
+                    </span>
                   </div>
-                </div>
-              ))}
-            </div>
 
-            {/* Education & Certifications */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-amber-400 uppercase tracking-wider">
-                <GraduationCap className="w-3.5 h-3.5" />
-                <span>Education & Certs</span>
-              </div>
-              {parsed_data?.education?.map((edu, idx) => (
-                <div key={idx} className="p-3.5 rounded-xl bg-[#0f1320] border border-white/5 space-y-1">
-                  <div className="text-xs font-bold text-white">{edu.degree}</div>
-                  <div className="text-[11px] text-slate-400">{edu.institution} • {edu.year}</div>
-                  <div className="text-xs text-emerald-400 font-medium">Grade: {edu.grade}</div>
-                </div>
-              ))}
-              {parsed_data?.certifications?.map((cert, idx) => (
-                <div key={idx} className="p-2.5 rounded-xl bg-[#0f1320] border border-white/5 text-xs text-slate-300">
-                  <span className="font-semibold text-white">{cert.name}</span> — {cert.issuer} ({cert.date})
+                  <ul className="mt-3 space-y-2">
+                    {exp.bullets?.map((b, bIdx) => (
+                      <li key={bIdx} className="text-xs text-[#c4ccd9] leading-relaxed flex items-start gap-2.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span>
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Education */}
+          <div className="surface-card p-5">
+            <h2 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">
+              Verified Academic Credentials
+            </h2>
+            {parsed_data?.education?.map((edu, i) => (
+              <div key={i} className="flex items-center justify-between text-xs">
+                <div>
+                  <h4 className="font-semibold text-white">{edu.degree}</h4>
+                  <p className="text-[#8c96a8] mt-0.5">{edu.institution}</p>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono text-emerald-400 block">{edu.grade}</span>
+                  <span className="text-[#6b7585] font-mono text-[11px]">{edu.duration}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
+        {/* Right Column: Recruiter Intelligence & Scorecard (5 Cols) */}
+        <div className="lg:col-span-5 space-y-6">
+          
+          {/* Executive Scorecard */}
+          <div className="surface-card p-5">
+            <div className="flex items-center justify-between pb-4 border-b border-[#1e2330]">
+              <div>
+                <span className="text-[11px] font-mono text-[#6b7585] uppercase tracking-wider">Candidate Benchmark</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-extrabold text-white font-mono">
+                    {score_data?.overall_score || 87}
+                  </span>
+                  <span className="text-xs text-[#6b7585] font-mono">/ 100</span>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="inline-block px-2.5 py-1 rounded bg-[#16251b] border border-[#23462c] text-emerald-400 font-medium text-xs">
+                  {score_data?.grade || "Tier-1 Competitive"}
+                </span>
+                <span className="block text-[11px] text-[#6b7585] mt-1 font-mono">
+                  {score_data?.percentile || "Top 8% percentile"}
+                </span>
+              </div>
+            </div>
+
+            {/* Score Dimensions Breakdown */}
+            <div className="mt-4 space-y-3">
+              {score_data?.categories?.map((cat, i) => (
+                <div key={i} className="text-xs">
+                  <div className="flex justify-between text-[#8c96a8] mb-1">
+                    <span>{cat.name}</span>
+                    <span className="font-mono text-white font-medium">{cat.score}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-[#181d27] rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full ${cat.score >= 90 ? "bg-emerald-500" : cat.score >= 80 ? "bg-blue-500" : "bg-amber-500"}`}
+                      style={{ width: `${cat.score}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-[#6b7585] mt-1">{cat.feedback}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Actionable Recruiter Tabs (Rewrites, Gaps, Strengths) */}
+          <div className="surface-card p-5">
+            <div className="flex items-center gap-1 p-1 bg-[#0e1016] rounded-lg border border-[#1b202c] mb-4">
+              <button
+                onClick={() => setActiveTab("rewrites")}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === "rewrites"
+                    ? "bg-[#1f2533] text-white font-semibold"
+                    : "text-[#8c96a8] hover:text-white"
+                }`}
+              >
+                Bullet Rewrites
+              </button>
+              <button
+                onClick={() => setActiveTab("gaps")}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === "gaps"
+                    ? "bg-[#1f2533] text-white font-semibold"
+                    : "text-[#8c96a8] hover:text-white"
+                }`}
+              >
+                Critical Gaps
+              </button>
+              <button
+                onClick={() => setActiveTab("strengths")}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === "strengths"
+                    ? "bg-[#1f2533] text-white font-semibold"
+                    : "text-[#8c96a8] hover:text-white"
+                }`}
+              >
+                Strengths
+              </button>
+            </div>
+
+            {/* Tab 1: Surgical Bullet Rewrites */}
+            {activeTab === "rewrites" && (
+              <div className="space-y-4">
+                <p className="text-xs text-[#8c96a8]">
+                  Replace weak or unquantified resume bullet points with recruiter-optimized statements:
+                </p>
+
+                {analysis_data?.bullet_rewrites?.map((item, idx) => (
+                  <div key={idx} className="p-3.5 rounded-lg border border-[#232937] bg-[#0e1117] space-y-2.5">
+                    {/* Before */}
+                    <div>
+                      <span className="text-[10px] font-mono uppercase text-rose-400 font-semibold block mb-1">
+                        Weak / Lacks Scale:
+                      </span>
+                      <p className="text-xs text-[#8c96a8] line-through decoration-rose-500/50">
+                        "{item.original}"
+                      </p>
+                    </div>
+
+                    {/* After */}
+                    <div className="pt-2 border-t border-[#1b202c]">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-mono uppercase text-emerald-400 font-semibold">
+                          ATS Optimized Rewrite:
+                        </span>
+                        <button
+                          onClick={() => handleCopy(item.rewritten, idx)}
+                          className="flex items-center gap-1 text-[11px] text-[#8c96a8] hover:text-white font-mono transition cursor-pointer"
+                        >
+                          {copiedIndex === idx ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-400" />
+                              <span className="text-emerald-400">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-xs text-white leading-relaxed font-medium">
+                        "{item.rewritten}"
+                      </p>
+                    </div>
+
+                    <p className="text-[11px] text-[#6b7585] pt-1">
+                      <strong className="text-[#8c96a8]">Why:</strong> {item.reason}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tab 2: Critical Gaps */}
+            {activeTab === "gaps" && (
+              <div className="space-y-3">
+                <p className="text-xs text-[#8c96a8]">
+                  Identified blind spots that could trigger screening disqualification:
+                </p>
+                {analysis_data?.weaknesses?.map((weakness, i) => (
+                  <div key={i} className="p-3 rounded-lg bg-[#181114] border border-[#3b1d22] text-xs text-[#fca5a5] flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    <span>{weakness}</span>
+                  </div>
+                ))}
+
+                <div className="pt-2">
+                  <h4 className="text-xs font-semibold text-white mb-2">Recommended Next Actions:</h4>
+                  <ul className="space-y-2">
+                    {analysis_data?.improvements?.map((imp, i) => (
+                      <li key={i} className="text-xs text-[#8c96a8] flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0"></span>
+                        <span>{imp}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 3: Key Strengths */}
+            {activeTab === "strengths" && (
+              <div className="space-y-3">
+                <p className="text-xs text-[#8c96a8]">
+                  Validated engineering competencies that position this candidate in the top tier:
+                </p>
+                {analysis_data?.strengths?.map((str, i) => (
+                  <div key={i} className="p-3 rounded-lg bg-[#101813] border border-[#1d3824] text-xs text-[#86efac] flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>{str}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
