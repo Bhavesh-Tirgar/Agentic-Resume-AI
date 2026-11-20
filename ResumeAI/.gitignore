@@ -176,4 +176,3 @@ pdf_cache/
 coverage.xml
 *.sqlite3
 *.db
-migrations/

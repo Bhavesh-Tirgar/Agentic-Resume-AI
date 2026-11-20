@@ -15,68 +15,31 @@ class ResumeProcessingService:
     @staticmethod
     @transaction.atomic
     def process(resume):
-   
         # Step 1: Check extracted text
-
-        if not resume.extracted_text:
-
-            return Response(
-                {
-                    "error": "Resume text not found."
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if not resume.extracted_text or not resume.extracted_text.strip():
+            raise ValueError("Resume extracted text not found. Please upload a valid resume PDF.")
 
         # Step 2: Run complete LangGraph
-
         try:
             result = run_resume_graph(resume.extracted_text)
-
         except Exception as exc:
             raise RuntimeError(
                 f"Resume AI processing failed: {str(exc)}"
             ) from exc
 
-            # return Response(
-            #     {
-            #         "error": "Resume processing failed.",
-            #         "details": str(exc)
-            #     },
-            #     status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            # )
-
         # Step 3: Get graph results
-        
         parsed_resume = result.get("parsed_resume")
-
         analysis = result.get("analysis")
-
         score = result.get("score")
 
         if parsed_resume is None:
-
-            return Response(
-                {
-                    "error": "Resume parser did not return a result."
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            raise RuntimeError("Resume parser did not return a valid result.")
 
         if analysis is None:
+            raise RuntimeError("Resume analysis did not return a valid result.")
 
-            return Response(
-                {
-                    "error": "Resume analysis did not return a result."
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
         if score is None:
-            return Response(
-                {
-                    "error": "Resume scoring did not return a result."
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            raise RuntimeError("Resume scoring did not return a valid result.")
             
 
         # Step 4: Save parser result
