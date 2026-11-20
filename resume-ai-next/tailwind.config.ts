@@ -9,24 +9,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        obsidian: {
-          DEFAULT: "#09090b",
-          950: "#050507",
-          900: "#09090b",
-          850: "#0f0f13",
-          800: "#131317",
-          700: "#18181b",
-          600: "#27272a",
+        canvas: "#090a0d",
+        surface: {
+          DEFAULT: "#111318",
+          subtle: "#0d0f13",
+          elevated: "#161920",
+          hover: "#1a1e27",
         },
-        emerald: {
-          DEFAULT: "#10b981",
-          glow: "#059669",
-          soft: "rgba(16, 185, 129, 0.12)",
+        border: {
+          DEFAULT: "#20242e",
+          subtle: "#181b22",
+          strong: "#2d3342",
         },
-        violet: {
-          DEFAULT: "#8b5cf6",
-          glow: "#7c3aed",
-          soft: "rgba(139, 92, 246, 0.12)",
+        accent: {
+          sage: "#22c55e",
+          steel: "#38bdf8",
+          amber: "#f59e0b",
         },
       },
       fontFamily: {
@@ -42,36 +40,17 @@ const config: Config = {
           "JetBrains Mono",
           "Menlo",
           "Monaco",
-          "Courier New",
           "monospace",
         ],
       },
-      transitionTimingFunction: {
-        luxury: "cubic-bezier(0.16, 1, 0.3, 1)",
-      },
       keyframes: {
-        shine: {
-          "0%": { backgroundPosition: "200% 0" },
-          "100%": { backgroundPosition: "-200% 0" },
-        },
         marquee: {
           "0%": { transform: "translateX(0%)" },
           "100%": { transform: "translateX(-50%)" },
         },
-        float: {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%": { transform: "translateY(-8px)" },
-        },
-        "pulse-glow": {
-          "0%, 100%": { opacity: "0.4", transform: "scale(1)" },
-          "50%": { opacity: "0.8", transform: "scale(1.05)" },
-        },
       },
       animation: {
-        shine: "shine 6s linear infinite",
-        marquee: "marquee 35s linear infinite",
-        float: "float 6s ease-in-out infinite",
-        "pulse-glow": "pulse-glow 8s ease-in-out infinite",
+        marquee: "marquee 40s linear infinite",
       },
     },
   },

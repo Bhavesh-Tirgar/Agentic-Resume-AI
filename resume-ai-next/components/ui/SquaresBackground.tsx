@@ -13,10 +13,10 @@ interface SquaresBackgroundProps {
 
 export function SquaresBackground({
   direction = "right",
-  speed = 0.5,
-  borderColor = "rgba(255, 255, 255, 0.05)",
-  squareSize = 44,
-  hoverFillColor = "rgba(16, 185, 129, 0.08)",
+  speed = 0.35,
+  borderColor = "rgba(255, 255, 255, 0.025)",
+  squareSize = 48,
+  hoverFillColor = "rgba(255, 255, 255, 0.035)",
   className = "",
 }: SquaresBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -57,7 +57,6 @@ export function SquaresBackground({
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Move grid based on direction and speed
       if (direction === "right") gridOffset.x = (gridOffset.x + speed) % squareSize;
       if (direction === "left") gridOffset.x = (gridOffset.x - speed) % squareSize;
       if (direction === "down") gridOffset.y = (gridOffset.y + speed) % squareSize;
@@ -70,7 +69,6 @@ export function SquaresBackground({
       const startX = Math.floor(gridOffset.x % squareSize) - squareSize;
       const startY = Math.floor(gridOffset.y % squareSize) - squareSize;
 
-      // Draw grid lines and hover highlight
       for (let x = startX; x < canvas.width + squareSize; x += squareSize) {
         for (let y = startY; y < canvas.height + squareSize; y += squareSize) {
           if (mouseRef.current) {

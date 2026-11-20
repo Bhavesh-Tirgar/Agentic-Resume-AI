@@ -2,7 +2,7 @@
 
 import React from "react";
 import { InfiniteMarquee } from "@/components/ui/InfiniteMarquee";
-import { TrendingUp, Users, Award, Shield } from "lucide-react";
+import { TrendingUp, Award } from "lucide-react";
 
 export function SocialProofMarquee() {
   const marqueeItems = [
@@ -17,30 +17,30 @@ export function SocialProofMarquee() {
   ];
 
   return (
-    <section className="relative py-12 border-y border-zinc-800/80 bg-zinc-950/60 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-          <p className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-            Candidates Hired at Tier-1 Engineering Orgs
+    <section className="relative py-8 border-y border-[#1a1e27] bg-[#0c0e13] overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]"></span>
+          <p className="text-xs font-mono uppercase tracking-wider text-[#626b79]">
+            Candidates Placed at Tier-1 Engineering Orgs
           </p>
         </div>
 
-        <div className="flex items-center gap-6 text-xs text-zinc-400 font-mono">
+        <div className="flex items-center gap-6 text-xs text-[#8c96a8] font-mono">
           <div className="flex items-center gap-1.5">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+            <TrendingUp className="w-3.5 h-3.5 text-[#22c55e]" />
             <span className="text-white font-semibold">+42%</span>
             <span>Avg. Compensation Bump</span>
           </div>
           <div className="hidden md:flex items-center gap-1.5">
-            <Award className="w-3.5 h-3.5 text-violet-400" />
+            <Award className="w-3.5 h-3.5 text-[#38bdf8]" />
             <span className="text-white font-semibold">94.2%</span>
-            <span>ATS Pass Rate</span>
+            <span>ATS Screener Pass Rate</span>
           </div>
         </div>
       </div>
 
-      <InfiniteMarquee items={marqueeItems} speed={32} />
+      <InfiniteMarquee items={marqueeItems} speed={36} />
     </section>
   );
 }

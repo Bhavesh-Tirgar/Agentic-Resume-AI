@@ -185,13 +185,17 @@ Runs at: `http://localhost:5173`
 ## 8. Next.js 14 Luxury Motion Architecture (MotionSites.ai & React Bits)
 
 Located at `resume-ai-next/`:
-- **Design Tokens:** Deep Obsidian (`#09090b`), Emerald Glow (`#10b981`), Electric Violet (`#8b5cf6`), and ambient depth (`blur-[130px]`).
+- **Design Tokens (Executive Titanium & Obsidian System):**
+  - **Base Canvas:** Deep Obsidian (`#090a0d`), Surface Cards (`#111318`), and Subtle Hairline Borders (`#20242e`).
+  - **Typographic Hierarchy:** Pure White (`#ffffff`) for dominant headlines and primary solid CTAs; Silver/Slate (`#94a3b8`) for high-legibility descriptions.
+  - **No AI Slop / Purged Tropes:** Eliminated electric violet/neon emerald dual-gradient washes, rainbow text gradients, and floating blur spheres. Replaced with razor-sharp hairline borders, crisp typography, and monochromatic white sheens.
+  - **Accent Status:** Muted Sage Green (`#22c55e`) reserved strictly for functional status indicators (ATS pass status, live recruiter checks).
 - **React Bits Component Hierarchy:**
-  - `SquaresBackground`: Interactive canvas grid responding to cursor hover.
-  - `ShinyText`: Dynamic linear gradient metallic text shine animation.
+  - `SquaresBackground`: Architectural canvas grid responding with subtle white luminescence (`rgba(255,255,255,0.035)`).
+  - `ShinyText`: Refined metallic titanium text shine animation.
   - `SplitText`: Staggered character entrance with `prefers-reduced-motion` compliance.
   - `TiltedCard`: 3D parallax tilt with `perspective-1000` tracking mouse position.
-  - `SpotlightCard`: Radial cursor-following glow around Bento card borders.
+  - `SpotlightCard`: Clean radial cursor-following glow around Bento card borders with crisp white sheen.
   - `InfiniteMarquee`: Hardware-accelerated hiring proof ticker.
 - **Bento Box Features:**
   - Card 1: 0-100 ATS Diagnostic with animated SVG circle and pass/fail checklist.
@@ -199,5 +203,5 @@ Located at `resume-ai-next/`:
   - Card 3: AI Cover Letter Writer with terminal streaming typewriter effect.
   - Card 4: Harvard, Tech Modern, and Executive ATS template preview slider.
 - **Comparative Before vs After Audit:** Interactive side-by-side inspection of rejected vs. hired bullet points.
-- **Pricing Matrix:** Animated Monthly/Lifetime toggle with a spring-animated "Save 40%" badge.
+- **Pricing Matrix:** Clean tiered matrix with Monthly/Lifetime toggle and high-contrast solid white selection.
 
