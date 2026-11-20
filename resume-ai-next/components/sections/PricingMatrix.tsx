@@ -8,48 +8,45 @@ export function PricingMatrix() {
 
   const plans = [
     {
-      name: "Free Scan",
+      name: "Free Diagnostic",
       price: "$0",
       cadence: "forever free",
-      description: "Essential ATS diagnostic report to check single-column readability and top keyword errors.",
+      description: "Basic single-column ATS verification and top keyword check.",
       features: [
-        "1 Resume PDF Ingestion",
-        "Overall ATS Compatibility Score (0-100)",
-        "Basic Missing Keyword Flags",
-        "Single-Column Plain Text Export",
+        "1 PDF resume evaluation",
+        "Overall ATS score (0-100)",
+        "Missing keyword detection",
+        "Plain-text export",
       ],
-      cta: "Start Free Scan",
+      cta: "Run Free Scan",
       highlighted: false,
     },
     {
-      name: "Pro Career",
-      price: billingCycle === "monthly" ? "$19" : "$99",
+      name: "Pro Engineer",
+      price: billingCycle === "monthly" ? "$19" : "$89",
       cadence: billingCycle === "monthly" ? "/month" : "one-time",
-      description: "Our flagship multi-agent workflow: unlimited job matching, bullet rewrites, and Harvard templates.",
+      description: "Full multi-agent suite for active interview cycles.",
       features: [
-        "Unlimited PDF & LinkedIn Ingestions",
-        "Deep LangGraph Recruiter Analysis",
-        "1-Click Bullet Point Rewriter (Quantified Metrics)",
-        "Targeted Job Description Matcher",
-        "STAR Interview Question Simulator",
-        "All 3 ATS Master Templates (PDF & DOCX)",
-        "Zero-Retention Privacy Guarantee",
+        "Unlimited resume scans",
+        "1-Click quantifiable bullet rewriter",
+        "Job description gap analysis",
+        "STAR interview question cockpit",
+        "Harvard & Tech ATS templates",
       ],
-      cta: "Upgrade to Pro Career",
+      cta: "Get Pro Access",
       highlighted: true,
-      badge: "Most Popular",
+      badge: "Recommended",
     },
     {
       name: "Executive Lifetime",
       price: "$149",
-      cadence: "lifetime access",
-      description: "For senior leaders, staff engineers, and executives demanding personalized resume architecture.",
+      cadence: "one-time",
+      description: "Lifetime access for staff engineers and engineering leaders.",
       features: [
-        "Lifetime Access to All Pro Capabilities",
-        "Executive Cover Letter Streamer",
-        "Priority LLM Routing (Gemini 2.5 Flash)",
-        "Direct LinkedIn Bio & Portfolio Alignment",
-        "Continuous Future Updates & Early Access",
+        "All Pro capabilities forever",
+        "Executive cover letter generator",
+        "Priority Gemini model routing",
+        "Lifetime platform updates",
       ],
       cta: "Get Lifetime Access",
       highlighted: false,
@@ -57,102 +54,94 @@ export function PricingMatrix() {
   ];
 
   return (
-    <section id="pricing" className="relative py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <section id="pricing" className="relative py-16 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="text-center max-w-3xl mx-auto mb-14 space-y-3">
-        <span className="text-xs font-mono uppercase tracking-wider text-[#626b79]">
+      <div className="text-center max-w-xl mx-auto mb-10 space-y-2">
+        <span className="text-xs font-mono uppercase tracking-wider text-slate-400 dark:text-zinc-500">
           Transparent Pricing
         </span>
-        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-          Invest in Interviews, Not Endless Applications
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+          Straightforward pricing.
         </h2>
-        <p className="text-[#8c96a8] text-sm sm:text-base leading-relaxed">
-          One optimized resume pays for itself in your very first offer negotiation. Cancel anytime.
+        <p className="text-slate-600 dark:text-[#8c96a8] text-xs sm:text-sm">
+          Run your diagnostic free. Upgrade when actively preparing for interviews.
         </p>
 
-        {/* Billing Switch */}
-        <div className="flex items-center justify-center gap-3 pt-3">
-          <div className="flex items-center p-1 rounded-full bg-[#111318] border border-[#20242e]">
+        {/* Billing Toggle */}
+        <div className="pt-2 flex items-center justify-center gap-2">
+          <div className="inline-flex items-center p-1 rounded-full bg-slate-100 dark:bg-[#111318] border border-slate-200 dark:border-[#20242e] text-xs font-medium">
             <button
               onClick={() => setBillingCycle("monthly")}
-              className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1 rounded-full transition cursor-pointer ${
                 billingCycle === "monthly"
-                  ? "bg-[#1f2533] text-white shadow-sm"
-                  : "text-[#8c96a8] hover:text-white"
+                  ? "bg-white dark:bg-[#1a1e27] text-slate-900 dark:text-white font-semibold shadow-xs"
+                  : "text-slate-500 dark:text-zinc-400"
               }`}
             >
-              Monthly Billing
+              Monthly
             </button>
             <button
               onClick={() => setBillingCycle("lifetime")}
-              className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1 rounded-full transition cursor-pointer ${
                 billingCycle === "lifetime"
-                  ? "bg-[#1f2533] text-white shadow-sm"
-                  : "text-[#8c96a8] hover:text-white"
+                  ? "bg-white dark:bg-[#1a1e27] text-slate-900 dark:text-white font-semibold shadow-xs"
+                  : "text-slate-500 dark:text-zinc-400"
               }`}
             >
-              <span>Lifetime Deal</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-[#132017] text-[#4ade80] border border-[#1e3c25] text-[10px] font-bold">
-                Save 40%
-              </span>
+              Lifetime (Save 40%)
             </button>
           </div>
         </div>
       </div>
 
-      {/* Cards Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        {plans.map((plan, idx) => (
+      {/* Plans Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
+        {plans.map((p, idx) => (
           <div
             key={idx}
-            className={`relative rounded-xl p-6 flex flex-col justify-between transition-colors ${
-              plan.highlighted
-                ? "bg-[#141720] border-2 border-[#384256] shadow-xl"
-                : "bg-[#111318] border border-[#20242e] hover:border-[#2b313f]"
+            className={`rounded-xl p-5 flex flex-col justify-between transition-all ${
+              p.highlighted
+                ? "border-2 border-slate-900 dark:border-white bg-white dark:bg-[#111318] shadow-lg relative"
+                : "border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] shadow-xs"
             }`}
           >
-            {plan.highlighted && (
-              <div className="absolute -top-3 left-6 px-2.5 py-0.5 rounded-full bg-white text-black text-[10px] font-bold font-mono tracking-wider uppercase shadow-sm">
-                {plan.badge}
-              </div>
+            {p.badge && (
+              <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase bg-slate-900 dark:bg-white text-white dark:text-black font-bold tracking-wider">
+                {p.badge}
+              </span>
             )}
 
             <div>
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-white tracking-tight">{plan.name}</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">{p.name}</h3>
               </div>
 
-              <div className="mt-3 flex items-baseline gap-1">
-                <span className="text-3xl font-bold text-white font-mono">{plan.price}</span>
-                <span className="text-xs text-[#626b79] font-mono">{plan.cadence}</span>
+              <div className="flex items-baseline gap-1 mb-2">
+                <span className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">{p.price}</span>
+                <span className="text-xs text-slate-400 dark:text-zinc-500 font-mono">{p.cadence}</span>
               </div>
 
-              <p className="mt-2 text-xs text-[#8c96a8] leading-relaxed min-h-[36px]">
-                {plan.description}
-              </p>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed mb-4">{p.description}</p>
 
-              <div className="mt-5 pt-5 border-t border-[#1b1f29] space-y-2.5">
-                <span className="text-[10px] font-mono text-[#626b79] uppercase tracking-wider block">
-                  Included Capabilities:
-                </span>
-                {plan.features.map((feature, fIdx) => (
-                  <div key={fIdx} className="flex items-start gap-2 text-xs text-[#c4ccd9]">
-                    <Check className="w-3.5 h-3.5 text-white shrink-0 mt-0.5" />
-                    <span>{feature}</span>
+              <div className="pt-3 border-t border-slate-100 dark:border-[#1a1f2b] space-y-2 mb-6">
+                {p.features.map((feat, fIdx) => (
+                  <div key={fIdx} className="flex items-center gap-2 text-xs text-slate-700 dark:text-zinc-300">
+                    <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span>{feat}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             <button
-              className={`mt-6 w-full py-2.5 px-4 rounded-lg font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                plan.highlighted
-                  ? "bg-white text-black hover:bg-[#e4e7eb]"
-                  : "bg-[#181c25] hover:bg-[#202634] text-white border border-[#252c3c]"
+              className={`w-full py-2.5 px-4 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                p.highlighted
+                  ? "bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 shadow-sm"
+                  : "bg-slate-100 dark:bg-[#181c25] text-slate-800 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-[#202633] border border-slate-200 dark:border-[#232a38]"
               }`}
             >
-              <span>{plan.cta}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>{p.cta}</span>
+              <ArrowRight className="w-3 h-3" />
             </button>
           </div>
         ))}

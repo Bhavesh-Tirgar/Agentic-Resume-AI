@@ -3,10 +3,14 @@
 import React, { useState, useRef } from "react";
 import { 
   UploadCloud, CheckCircle2, ShieldCheck, 
-  Zap, Copy, Check, RefreshCw 
+  ArrowRight, Copy, Check, RefreshCw 
 } from "lucide-react";
 
-export function AtsScannerSection() {
+interface AtsScannerSectionProps {
+  onOpenStudio?: () => void;
+}
+
+export function AtsScannerSection({ onOpenStudio }: AtsScannerSectionProps) {
   const [dragActive, setDragActive] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
@@ -15,10 +19,10 @@ export function AtsScannerSection() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const steps = [
-    { title: "Binary Parsing & Magic Bytes", desc: "Validating header %PDF-1.4 and extracting text layer" },
-    { title: "Semantic Entity Extractor", desc: "Structuring skills, experience bullets, and education" },
-    { title: "ATS Screener Engine", desc: "Benchmarking against Workday & Taleo algorithm schemas" },
-    { title: "Executive Bullet Optimizer", desc: "Injecting quantified impact metrics and action verbs" },
+    { title: "Binary Validation", desc: "Verifying %PDF magic bytes" },
+    { title: "Entity Extraction", desc: "Structuring skills and experience" },
+    { title: "Screener Benchmark", desc: "Testing Workday and Lever heuristics" },
+    { title: "Bullet Optimization", desc: "Evaluating quantifiable impact" },
   ];
 
   const handleStartScan = async () => {
@@ -28,7 +32,7 @@ export function AtsScannerSection() {
 
     for (let i = 0; i < steps.length; i++) {
       setActiveStep(i);
-      await new Promise((r) => setTimeout(r, 450));
+      await new Promise((r) => setTimeout(r, 400));
     }
 
     setScanning(false);
@@ -42,184 +46,144 @@ export function AtsScannerSection() {
   };
 
   return (
-    <section id="scanner" className="relative py-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
+    <section id="scanner" className="relative py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
       {/* Title */}
-      <div className="text-center mb-10 space-y-3">
-        <span className="text-xs font-mono uppercase tracking-wider text-[#626b79]">
+      <div className="text-center mb-8 space-y-2">
+        <span className="text-xs font-mono uppercase tracking-wider text-slate-400 dark:text-zinc-500">
           Interactive Diagnostic
         </span>
-        <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
           Live ATS Resume Scanner
         </h2>
-        <p className="text-[#8c96a8] text-sm max-w-xl mx-auto">
-          Drop your resume PDF or run our instant demonstration to evaluate compatibility across automated hiring screeners.
+        <p className="text-slate-600 dark:text-[#8c96a8] text-xs sm:text-sm max-w-lg mx-auto">
+          Drop your PDF or run the demonstration to inspect compatibility across automated hiring screeners.
         </p>
       </div>
 
       {/* Upload Zone */}
-      <div className="rounded-xl bg-[#111318] border border-[#20242e] p-8 text-center shadow-lg">
+      <div className="rounded-xl bg-white dark:bg-[#111318] border border-slate-200 dark:border-[#20242e] p-6 sm:p-8 text-center shadow-sm transition-colors">
         <input
           ref={fileInputRef}
           type="file"
           accept=".pdf"
-          onChange={handleStartScan}
           className="hidden"
+          onChange={() => handleStartScan()}
         />
 
-        {!scanning && !hasScanned && (
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-            onDragLeave={() => setDragActive(false)}
-            onDrop={(e) => { e.preventDefault(); setDragActive(false); handleStartScan(); }}
-            onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-lg p-8 cursor-pointer transition-all ${
-              dragActive
-                ? "border-[#22c55e] bg-[#121c15]"
-                : "border-[#242936] hover:border-[#353d50] hover:bg-[#151922]"
-            }`}
-          >
-            <div className="w-12 h-12 rounded-lg bg-[#181c25] border border-[#242b38] flex items-center justify-center text-[#8c96a8] mx-auto mb-3">
-              <UploadCloud className="w-6 h-6 text-white" />
-            </div>
-
-            <p className="text-sm font-semibold text-white">
-              Drag & drop your PDF resume here, or <span className="text-white underline underline-offset-2">browse files</span>
-            </p>
-            <p className="text-xs text-[#626b79] mt-1">
-              Supports standard single/multi-column PDFs up to 5MB
-            </p>
-
-            <div className="mt-6 pt-5 border-t border-[#1b1f29] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#626b79]">
-              <span className="flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#22c55e]" />
-                <span>Zero Data Retention • Ephemeral Parsing Only</span>
-              </span>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleStartScan();
-                }}
-                className="px-3 py-1.5 rounded-md bg-[#181c25] hover:bg-[#202634] text-white font-medium border border-[#252c3c] transition cursor-pointer flex items-center gap-1.5"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span>Instant Demo: Test Alex Rivera Resume</span>
-              </button>
-            </div>
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={(e) => { e.preventDefault(); setDragActive(false); handleStartScan(); }}
+          onClick={() => fileInputRef.current?.click()}
+          className={`border-2 border-dashed rounded-lg p-6 sm:p-8 flex flex-col items-center justify-center transition cursor-pointer ${
+            dragActive
+              ? "border-slate-500 bg-slate-50 dark:bg-white/[0.04]"
+              : "border-slate-300 dark:border-[#282d3b] hover:border-slate-400 dark:hover:border-zinc-700 bg-slate-50/50 dark:bg-[#0c0e14]"
+          }`}
+        >
+          <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-[#161a23] border border-slate-200 dark:border-[#242a38] flex items-center justify-center text-slate-600 dark:text-zinc-400 mb-3">
+            <UploadCloud className="w-5 h-5" />
           </div>
-        )}
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+            Click to upload or drag and drop resume PDF
+          </h3>
+          <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">
+            Max 5MB • Validated with binary %PDF- verification
+          </p>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleStartScan(); }}
+            className="mt-4 px-4 py-2 rounded-lg text-xs font-semibold text-white dark:text-black bg-slate-900 dark:bg-white hover:opacity-90 transition shadow-xs"
+          >
+            Run Sample Diagnostic Scan
+          </button>
+        </div>
 
-        {/* Scanning Progress */}
+        {/* Live Multi-Stage Progress */}
         {scanning && (
-          <div className="py-4 text-left max-w-md mx-auto space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-mono uppercase text-white flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
-                Analyzing Document...
+          <div className="mt-6 pt-6 border-t border-slate-100 dark:border-[#1e2330] space-y-4 text-left max-w-lg mx-auto">
+            <div className="flex items-center justify-between text-xs font-mono text-slate-500 dark:text-zinc-400">
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-500" />
+                <span>Processing Multi-Agent StateGraph...</span>
               </span>
-              <span className="text-xs font-mono text-[#626b79]">Step {activeStep + 1} of 4</span>
+              <span>Step {activeStep + 1} of 4</span>
             </div>
 
             <div className="space-y-2">
               {steps.map((st, i) => (
                 <div
                   key={i}
-                  className={`p-2.5 rounded-md border text-xs transition-colors ${
-                    i === activeStep
-                      ? "bg-[#181c25] border-[#384155] text-white"
-                      : i < activeStep
-                      ? "bg-[#0d0f14] border-[#1c202a] text-[#626b79]"
-                      : "bg-[#0d0f14] border-transparent text-[#424855]"
+                  className={`flex items-center justify-between p-2.5 rounded-lg border text-xs transition ${
+                    i <= activeStep
+                      ? "border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-[#151922] text-slate-900 dark:text-white font-medium"
+                      : "border-transparent text-slate-400 dark:text-zinc-600"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold">{st.title}</span>
-                    {i < activeStep && <CheckCircle2 className="w-3.5 h-3.5 text-[#22c55e]" />}
-                    {i === activeStep && <span className="text-[10px] font-mono text-white">Processing...</span>}
+                  <div className="flex items-center gap-2.5">
+                    {i < activeStep ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    ) : i === activeStep ? (
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    ) : (
+                      <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-zinc-800" />
+                    )}
+                    <span>{st.title}</span>
                   </div>
-                  <p className="text-[11px] text-[#626b79] mt-0.5">{st.desc}</p>
+                  <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500">{st.desc}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Diagnostic Results View */}
+        {/* Diagnostic Results Preview */}
         {hasScanned && (
-          <div className="space-y-5 text-left">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-[#1b1f29]">
-              <div>
-                <span className="text-[10px] font-mono uppercase text-[#4ade80] font-semibold">
-                  Evaluation Complete • Candidate: Alex Rivera
-                </span>
-                <h3 className="text-base font-bold text-white mt-0.5">Senior Distributed Systems Engineer</h3>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <div className="flex items-baseline gap-1 px-3 py-1.5 rounded-lg bg-[#132017] border border-[#1e3c25] text-[#4ade80] font-mono">
-                  <span className="text-2xl font-black">98</span>
-                  <span className="text-xs">/100</span>
-                </div>
-
-                <button
-                  onClick={() => setHasScanned(false)}
-                  className="px-3 py-1.5 rounded-lg bg-[#181c25] hover:bg-[#202634] text-zinc-300 hover:text-white text-xs font-medium border border-[#252c3c] transition cursor-pointer flex items-center gap-1.5"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Scan Another</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Diagnostic Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
-              <div className="p-3.5 rounded-lg bg-[#0d0f14] border border-[#1c202a] space-y-2">
-                <span className="text-[10px] font-mono uppercase text-[#626b79] block">Matched High-Value Keywords:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="px-2 py-0.5 rounded bg-[#151922] border border-[#222735] text-[#b8c2d1] font-mono text-[10px]">
-                    Kubernetes (+24%)
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#151922] border border-[#222735] text-[#b8c2d1] font-mono text-[10px]">
-                    Distributed Systems
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#151922] border border-[#222735] text-[#b8c2d1] font-mono text-[10px]">
-                    Kafka Pipelines
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#151922] border border-[#222735] text-[#b8c2d1] font-mono text-[10px]">
-                    p99 Latency Tuning
-                  </span>
+          <div className="mt-6 pt-6 border-t border-slate-100 dark:border-[#1e2330] text-left max-w-2xl mx-auto space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl font-black font-mono text-slate-900 dark:text-white">91 / 100</span>
+                <div>
+                  <h4 className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                    Tier-1 Screen Pass Verified
+                  </h4>
+                  <p className="text-[11px] text-slate-600 dark:text-zinc-300">
+                    High quantifiable metric density and clean single-column structure.
+                  </p>
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-lg bg-[#0d0f14] border border-[#1c202a] space-y-1.5">
-                <span className="text-[10px] font-mono uppercase text-[#626b79] block">Recruiter Action Item:</span>
-                <p className="text-[#8c96a8] leading-relaxed text-[11px]">
-                  Add 1 explicit reference to cloud infrastructure-as-code (Terraform or CloudFormation) to qualify for 100% of Staff-level postings.
-                </p>
-              </div>
+              {onOpenStudio && (
+                <button
+                  onClick={onOpenStudio}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white dark:text-black bg-slate-900 dark:bg-white hover:opacity-90 transition cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
+                >
+                  <span>Open Full Dossier</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* AI Bullet Rewrite Highlight */}
-            <div className="p-3.5 rounded-lg bg-[#0d0f14] border border-[#1c202a] space-y-1.5 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase text-[#4ade80] font-semibold">
-                  Recommended Bullet Point Rewrite:
+            <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#0c0e14] border border-slate-200 dark:border-[#1e2330] space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[10px] font-mono uppercase text-emerald-600 dark:text-emerald-400 font-bold">
+                  Recommended Bullet Calibration
                 </span>
                 <button
-                  onClick={() => handleCopy("Architected event-driven microservices processing 45,000 req/sec with 99.99% uptime, reducing infrastructure compute costs by $180,000 annually.")}
-                  className="flex items-center gap-1 font-mono text-[#8c96a8] hover:text-white transition cursor-pointer"
+                  onClick={() => handleCopy("Architected 14+ REST endpoints in DRF, cutting p99 latency to <45ms across 18k DAU.")}
+                  className="flex items-center gap-1 text-[11px] font-mono text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
                 >
-                  {copied ? <Check className="w-3 h-3 text-[#4ade80]" /> : <Copy className="w-3 h-3" />}
-                  <span>{copied ? "Copied" : "Copy Rewrite"}</span>
+                  {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                  <span>{copied ? "Copied" : "Copy"}</span>
                 </button>
               </div>
-              <p className="text-white font-medium font-mono text-[11px] leading-relaxed">
-                "Architected event-driven microservices processing 45,000 req/sec with 99.99% uptime, reducing infrastructure compute costs by $180,000 annually."
+              <p className="text-xs text-slate-900 dark:text-zinc-200 font-medium font-mono leading-relaxed">
+                "Architected 14+ REST endpoints in DRF, cutting p99 latency to &lt;45ms across 18k DAU."
               </p>
             </div>
           </div>
         )}
+
       </div>
     </section>
   );

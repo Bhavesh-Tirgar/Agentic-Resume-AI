@@ -8,15 +8,16 @@ import { TiltedCard } from "@/components/ui/TiltedCard";
 import { AmbientAura } from "@/components/ui/AmbientAura";
 import { 
   ArrowRight, Upload, CheckCircle2, Shield, 
-  FileCheck, Star 
+  FileCheck, Sparkles 
 } from "lucide-react";
 import { luxuryEasing } from "@/lib/motion";
 
 interface HeroSectionProps {
   onScanClick?: () => void;
+  onOpenStudio?: () => void;
 }
 
-export function HeroSection({ onScanClick }: HeroSectionProps) {
+export function HeroSection({ onScanClick, onOpenStudio }: HeroSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -26,193 +27,156 @@ export function HeroSection({ onScanClick }: HeroSectionProps) {
   };
 
   return (
-    <section className="relative min-h-[88vh] flex items-center justify-center pt-28 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden">
-      {/* Background Architectural Grid & Subtle Vignette */}
-      <SquaresBackground
-        direction="diagonal"
-        speed={0.3}
-        squareSize={48}
-        borderColor="rgba(255, 255, 255, 0.02)"
-        hoverFillColor="rgba(255, 255, 255, 0.03)"
-      />
+    <section className="relative min-h-[85vh] flex items-center justify-center pt-28 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      {/* Background Architectural Grid */}
+      <SquaresBackground direction="diagonal" speed={0.3} squareSize={48} />
       <AmbientAura variant="hero" />
 
       {/* Main Container */}
       <div className="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
         
         {/* Left Copy & Actions (7 Cols) */}
-        <div className="lg:col-span-7 text-center lg:text-left space-y-6">
+        <div className="lg:col-span-7 text-center lg:text-left space-y-5">
           
-          {/* Subtle Status Pill */}
+          {/* Status Pill */}
           <motion.div
-            initial={{ opacity: 0, y: -12 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: luxuryEasing }}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#12151c] border border-[#202532] shadow-sm"
+            transition={{ duration: 0.4, ease: luxuryEasing }}
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-[#12151c] border border-slate-200 dark:border-[#202532] shadow-xs"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
             <ShinyText
-              text="Ranked #1 AI Resume Builder & ATS Scanner"
+              text="Calibrated for engineering leaders"
               className="text-xs font-medium tracking-wide"
               speed={4}
             />
           </motion.div>
 
-          {/* Solid White Headline (No Gradients) */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-[-0.03em] text-white leading-[1.08]">
-            Craft Resumes That Beat the ATS & Land 3x More Interviews
+          {/* Headline */}
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.12]">
+            Resumes engineered for technical interviews.
           </h1>
 
           {/* Subtitle */}
           <motion.p
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15, ease: luxuryEasing }}
-            className="text-sm sm:text-base text-[#949ca8] max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal"
+            transition={{ duration: 0.5, delay: 0.1, ease: luxuryEasing }}
+            className="text-sm sm:text-base text-slate-600 dark:text-[#949ca8] max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal"
           >
-            Upload your resume or paste a job link. Our multi-agent AI rewrites weak bullets into quantified accomplishments, fixes ATS blind spots, and aligns keyword density in seconds.
+            Instant ATS diagnostic scoring, quantifiable bullet rewrites, and role alignment without recruiter jargon.
           </motion.p>
 
-          {/* Dual CTAs (Solid White & Titanium) */}
+          {/* Dual CTAs */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.25, ease: luxuryEasing }}
-            className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5 pt-2"
+            transition={{ duration: 0.5, delay: 0.2, ease: luxuryEasing }}
+            className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 pt-2"
           >
             {/* Primary Action */}
             <button
-              onClick={onScanClick}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-xs font-semibold text-black bg-white hover:bg-[#e4e7eb] shadow-sm transition-all active:scale-95 cursor-pointer"
+              onClick={onOpenStudio || onScanClick}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-xs font-semibold text-white dark:text-black bg-slate-900 dark:bg-white hover:opacity-90 shadow-sm transition-all active:scale-95 cursor-pointer"
             >
-              <span>Build My Resume Free</span>
+              <span>Launch ATS Studio</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
 
             {/* Secondary Action */}
             <input
-              ref={fileInputRef}
               type="file"
-              accept=".pdf"
+              ref={fileInputRef}
               onChange={handleFileChange}
+              accept=".pdf"
               className="hidden"
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg text-xs font-semibold text-[#c8cfdc] bg-[#141720] hover:bg-[#1a1f2b] border border-[#222836] transition-all active:scale-95 cursor-pointer"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-xs font-medium text-slate-800 dark:text-zinc-200 bg-white dark:bg-[#12151c] border border-slate-200 dark:border-[#202533] hover:bg-slate-50 dark:hover:bg-[#181d26] transition cursor-pointer shadow-xs"
             >
-              <Upload className="w-3.5 h-3.5 text-[#8c96a8]" />
-              <span>Upload PDF (Instant ATS Score)</span>
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload PDF to Scan</span>
             </button>
           </motion.div>
 
-          {/* Micro Trust Row */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-            className="flex flex-wrap items-center justify-center lg:justify-start gap-6 pt-3 text-xs text-[#626b79] font-medium"
-          >
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#22c55e]" />
-              <span>Workday & Taleo Compliant</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-[#22c55e]" />
-              <span>100% Private • Ephemeral Ingestion</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="flex text-amber-400">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-3 h-3 fill-amber-400" />
-                ))}
-              </div>
-              <span className="text-zinc-300 font-semibold">4.9/5</span>
-              <span>(12,400+ Resumes Scored)</span>
-            </div>
-          </motion.div>
+          {/* Minimal Trust Signals */}
+          <div className="pt-2 flex items-center justify-center lg:justify-start gap-4 text-[11px] font-mono text-slate-400 dark:text-zinc-500">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Pydantic v2 schemas</span>
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Prompt injection defense</span>
+            </span>
+            <span>•</span>
+            <span>Zero sales spam</span>
+          </div>
+
         </div>
 
-        {/* Right 3D Tilted Card (5 Cols) */}
+        {/* Right 3D Mockup (5 Cols) */}
         <div className="lg:col-span-5 flex justify-center">
           <TiltedCard maxAngle={8} className="w-full max-w-md">
-            <div className="relative rounded-xl bg-[#111318] border border-[#20242e] p-5 shadow-2xl transition-colors hover:border-[#2d3342]">
+            <div className="relative rounded-xl border border-slate-200 dark:border-[#202533] bg-white dark:bg-[#111318] p-5 shadow-xl transition-colors">
               
-              {/* Top ATS Score Pill */}
-              <div className="flex items-center justify-between pb-3.5 border-b border-[#1c202a]">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-md bg-[#181c25] border border-[#242b38] flex items-center justify-center text-[#8c96a8]">
-                    <FileCheck className="w-3.5 h-3.5" />
+              {/* Header with ATS Score */}
+              <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-[#1b1f2b]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#171a23] border border-slate-200 dark:border-[#262c3b] flex items-center justify-center text-slate-900 dark:text-white font-mono text-xs font-bold">
+                    91
                   </div>
                   <div>
-                    <h2 className="text-xs font-bold text-white tracking-tight">ATS Diagnostic Score</h2>
-                    <p className="text-[10px] text-[#626b79] font-mono">Workday Screener Engine v4.2</p>
+                    <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Bhavesh Tirgar</h4>
+                    <p className="text-[10px] text-slate-400 dark:text-zinc-500">Senior Systems & AI Engineer</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 px-2.5 py-0.5 rounded bg-[#132017] border border-[#1e3c25] text-[#4ade80] font-mono">
-                  <span className="text-sm font-bold">98</span>
-                  <span className="text-[10px] text-[#4ade80]/70">/100</span>
+                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  Tier-1 Match
+                </span>
+              </div>
+
+              {/* Parsed Competency Badges */}
+              <div className="py-3.5 border-b border-slate-100 dark:border-[#1b1f2b] space-y-2">
+                <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-zinc-500 block">
+                  Audited Technical Competencies
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Python / DRF", "LangGraph Agents", "PostgreSQL", "Docker", "Redis"].map((kw, i) => (
+                    <span 
+                      key={i} 
+                      className="px-2 py-0.5 rounded bg-slate-100 dark:bg-[#151922] border border-slate-200 dark:border-[#202533] text-[10px] font-mono text-slate-700 dark:text-zinc-300"
+                    >
+                      {kw}
+                    </span>
+                  ))}
                 </div>
               </div>
 
-              {/* Mock Resume Document Interior */}
-              <div className="mt-4 space-y-3.5 text-left text-xs">
-                
-                {/* Candidate Header */}
-                <div className="space-y-0.5">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-white tracking-tight">Alex Rivera</h3>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#171b23] border border-[#222733] text-[#8c96a8]">Senior Systems Lead</span>
+              {/* Quantified Bullet Diff */}
+              <div className="pt-3.5 space-y-2">
+                <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-zinc-500 block">
+                  Live Bullet Point Calibration
+                </span>
+                <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-[#0c0e14] border border-slate-100 dark:border-[#1a1f2b] space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 dark:text-zinc-500">
+                    <span className="text-rose-500 line-through">Built APIs with Django</span>
+                    <span className="text-emerald-600 dark:text-emerald-400">+34% Score Impact</span>
                   </div>
-                  <p className="text-[11px] text-[#626b79] font-mono">San Francisco, CA • alex.rivera@tech.io • github.com/arivera</p>
-                </div>
-
-                {/* Keyword Highlights */}
-                <div className="p-2.5 rounded-lg bg-[#0e1015] border border-[#1b1f29] space-y-1.5">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#626b79] block">
-                    Verified Keyword Alignment:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className="px-2 py-0.5 rounded bg-[#151922] border border-[#222735] text-[#b8c2d1] font-mono text-[10px]">
-                      Kubernetes (+24%)
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-[#151922] border border-[#222735] text-[#b8c2d1] font-mono text-[10px]">
-                      Distributed Systems
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-[#151922] border border-[#222735] text-[#b8c2d1] font-mono text-[10px]">
-                      Kafka Pipelines
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-[#151922] border border-[#222735] text-[#b8c2d1] font-mono text-[10px]">
-                      LangGraph Agents
-                    </span>
-                  </div>
-                </div>
-
-                {/* Experience Bullet Demonstration */}
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-semibold text-white">Staff Infrastructure Engineer</span>
-                    <span className="text-[#626b79] font-mono">2023 - Present</span>
-                  </div>
-                  <p className="text-[11px] text-[#949ca8] leading-relaxed pl-2 border-l-2 border-[#202532]">
-                    Architected event-driven microservices processing 45,000 req/sec with 99.99% uptime, reducing infrastructure compute costs by $180,000 annually.
+                  <p className="text-xs text-slate-900 dark:text-zinc-200 font-medium leading-relaxed">
+                    "Architected 14+ REST endpoints in DRF, cutting p99 latency to &lt;45ms across 18k DAU."
                   </p>
                 </div>
-
-                {/* Real-time Floating AI Suggestion Pill */}
-                <div className="p-2.5 rounded-lg bg-[#141720] border border-[#222836] flex items-center justify-between gap-2 text-xs">
-                  <span className="text-[11px] text-[#c4ccd9]">
-                    <strong className="text-white">AI Suggestion:</strong> Added quantified ARR metric (+$1.2M)
-                  </span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#152319] border border-[#22442a] text-[#4ade80] font-semibold">
-                    +14% ATS
-                  </span>
-                </div>
               </div>
+
             </div>
           </TiltedCard>
         </div>
+
       </div>
     </section>
   );

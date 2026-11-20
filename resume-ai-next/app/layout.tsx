@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "Resume AI — Executive AI Resume Builder & Real-Time ATS Scanner",
-  description: "Craft resumes that beat enterprise ATS screeners & land 3x more interviews. Powered by LangGraph multi-agent architecture and MotionSites.ai luxury design.",
+  title: "Resume AI — Technical Resume & ATS Diagnostic System",
+  description: "Audited resume evaluations, recruiter bullet rewrites, and job match alignment for software engineers.",
 };
 
 export default function RootLayout({
@@ -13,8 +14,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark scroll-smooth">
-      <body className="min-h-screen bg-[#09090b] text-zinc-100 antialiased selection:bg-emerald-500/30 selection:text-white">
-        {children}
+      <body className="min-h-screen antialiased transition-colors duration-200">
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

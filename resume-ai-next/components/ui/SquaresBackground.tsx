@@ -1,26 +1,28 @@
 "use client";
 
 import React, { useRef, useEffect } from "react";
+import { useTheme } from "../ThemeProvider";
 
 interface SquaresBackgroundProps {
   direction?: "diagonal" | "up" | "right" | "down" | "left";
   speed?: number;
-  borderColor?: string;
   squareSize?: number;
-  hoverFillColor?: string;
   className?: string;
 }
 
 export function SquaresBackground({
   direction = "right",
   speed = 0.35,
-  borderColor = "rgba(255, 255, 255, 0.025)",
   squareSize = 48,
-  hoverFillColor = "rgba(255, 255, 255, 0.035)",
   className = "",
 }: SquaresBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef<{ x: number; y: number } | null>(null);
+  const { theme } = useTheme();
+
+  const isLight = theme === "light";
+  const borderColor = isLight ? "rgba(15, 23, 42, 0.06)" : "rgba(255, 255, 255, 0.025)";
+  const hoverFillColor = isLight ? "rgba(15, 23, 42, 0.04)" : "rgba(255, 255, 255, 0.035)";
 
   useEffect(() => {
     const canvas = canvasRef.current;
