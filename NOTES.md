@@ -160,15 +160,44 @@ python manage.py runserver 8000
 ```
 Backend runs at: `http://localhost:8000`
 
-### Frontend Setup (React + Vite)
+### Frontend Setup Option A: Next.js 14 Luxury App Router (MotionSites.ai + React Bits)
+```powershell
+# 1. Navigate to resume-ai-next directory
+cd resume-ai-next
+
+# 2. Run the Next.js production/dev server
+npm run dev -- -p 3000
+```
+Runs at: `http://localhost:3000`
+
+### Frontend Setup Option B: React 19 Client App (Vite)
 ```powershell
 # 1. Navigate to frontend directory
 cd frontend
 
-# 2. Install dependencies (if not already done)
-npm install
-
-# 3. Start Vite dev server
+# 2. Start Vite dev server
 npm run dev
 ```
-Frontend runs at: `http://localhost:5173`
+Runs at: `http://localhost:5173`
+
+---
+
+## 8. Next.js 14 Luxury Motion Architecture (MotionSites.ai & React Bits)
+
+Located at `resume-ai-next/`:
+- **Design Tokens:** Deep Obsidian (`#09090b`), Emerald Glow (`#10b981`), Electric Violet (`#8b5cf6`), and ambient depth (`blur-[130px]`).
+- **React Bits Component Hierarchy:**
+  - `SquaresBackground`: Interactive canvas grid responding to cursor hover.
+  - `ShinyText`: Dynamic linear gradient metallic text shine animation.
+  - `SplitText`: Staggered character entrance with `prefers-reduced-motion` compliance.
+  - `TiltedCard`: 3D parallax tilt with `perspective-1000` tracking mouse position.
+  - `SpotlightCard`: Radial cursor-following glow around Bento card borders.
+  - `InfiniteMarquee`: Hardware-accelerated hiring proof ticker.
+- **Bento Box Features:**
+  - Card 1: 0-100 ATS Diagnostic with animated SVG circle and pass/fail checklist.
+  - Card 2: 1-Click Job Tailor with before/after bullet morphing.
+  - Card 3: AI Cover Letter Writer with terminal streaming typewriter effect.
+  - Card 4: Harvard, Tech Modern, and Executive ATS template preview slider.
+- **Comparative Before vs After Audit:** Interactive side-by-side inspection of rejected vs. hired bullet points.
+- **Pricing Matrix:** Animated Monthly/Lifetime toggle with a spring-animated "Save 40%" badge.
+
