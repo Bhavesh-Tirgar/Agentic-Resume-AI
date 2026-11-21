@@ -370,3 +370,37 @@ The system is now fully industry-agnostic and universally adaptive across all pr
 - **Universal ATS Keywords & Skills UI:**
   - Replaced tech-only skill filtering in `AtsStudio.tsx` with dynamic domain keyword extraction (`all_extracted`), ensuring non-technical resumes display their true competencies (*Salesforce, Tally, GAAP, SEO, B2B Negotiation*).
   - Added universal industry presets to `JobMatchStudio.tsx` and an **Industry Domain Filter** to `JobScoutStudio.tsx`.
+
+---
+
+## 14. 401 Unauthorized Root Cause & Self-Healing Auto-Recovery
+
+### 1. Root Cause of "Why Everything Failed"
+- **The Stale Token Deadlock:**
+  - In `ResumeAI/Backend/settings.py`, SimpleJWT's `ACCESS_TOKEN_LIFETIME` was set to `60 minutes`.
+  - In `resume-ai-next/lib/api.ts`, `ensureAuthenticatedSession()` checked `if (existing) return existing;`.
+  - When the user's browser stored an access token that expired or became invalid, `api.ts` continuously attached `Authorization: Bearer <expired_token>` on every single outgoing API call.
+  - Django REST Framework correctly rejected every call with `401 Unauthorized: Given token not valid for any token type`.
+  - Because `api.ts` never cleared `localStorage` on 401, every button click (*Upload*, *Run Match*, *Job Scout*, *Interview Prep*) immediately failed with 401 in an infinite loop.
+
+### 2. Self-Healing Fetch Wrapper (`fetchWithAuth`)
+We replaced raw `fetch` with an auto-recovering authentication wrapper in [api.ts](file:///C:/Users/DELL/.gemini/antigravity/scratch/bhavesh/resume-ai-next/lib/api.ts):
+```typescript
+export async function fetchWithAuth(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  let token = await ensureAuthenticatedSession();
+  let res = await fetch(url, { ...options, headers: buildHeaders(token) });
+
+  // Self-Healing: if 401 Unauthorized is detected, wipe stale token,
+  // authenticate fresh guest JWT, and transparently retry the request once!
+  if (res.status === 401) {
+    removeAuthToken();
+    token = await acquireFreshToken();
+    if (token) {
+      res = await fetch(url, { ...options, headers: buildHeaders(token) });
+    }
+  }
+  return res;
+}
+```
+- **Extended Token Lifetime:** Increased `ACCESS_TOKEN_LIFETIME` in `Backend/settings.py` to `30 days` to prevent premature session expiration during active testing.
+- **Dedicated App Router Subpages:** Pre-rendered discrete pages for `/studio`, `/matcher`, `/scout`, `/interview`, and `/jobs` to eliminate 404 errors on direct navigation or refresh.
