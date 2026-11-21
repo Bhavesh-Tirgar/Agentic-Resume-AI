@@ -23,9 +23,20 @@ export function JobScoutStudio({
   const [data, setData] = useState<JobDiscoveryData>(DEMO_DISCOVERED_JOBS);
   const [locationInput, setLocationInput] = useState("Ahmedabad, Gujarat");
   const [selectedWorkType, setSelectedWorkType] = useState<"All" | "Remote" | "Hybrid" | "On-site">("All");
+  const [selectedIndustry, setSelectedIndustry] = useState<string>("All Fields");
   const [isScouting, setIsScouting] = useState(false);
   const [apiNotice, setApiNotice] = useState<string | null>(null);
-  const [minMatchFilter, setMinMatchFilter] = useState<number>(80);
+  const [minMatchFilter, setMinMatchFilter] = useState<number>(75);
+
+  const industries = [
+    "All Fields",
+    "Sales & Business",
+    "Finance & Accounting",
+    "Marketing & Content",
+    "Operations & Supply",
+    "Engineering & Tech",
+    "Healthcare"
+  ];
 
   const effectiveResumeId = activeResumeId || getActiveResumeId();
 
@@ -184,6 +195,30 @@ export function JobScoutStudio({
             onChange={(e) => setMinMatchFilter(parseInt(e.target.value, 10))}
             className="w-full accent-emerald-500 cursor-pointer h-6"
           />
+        </div>
+
+        {/* Universal Industry Category Filter */}
+        <div className="md:col-span-12 pt-3 border-t border-slate-100 dark:border-[#1d212c] flex items-center gap-2 overflow-x-auto pb-1">
+          <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500 uppercase tracking-wider shrink-0 mr-1">
+            Industry Domain:
+          </span>
+          {industries.map((ind) => (
+            <button
+              key={ind}
+              onClick={() => {
+                setSelectedIndustry(ind);
+                const queryText = ind === "All Fields" ? locationInput : `${locationInput} (${ind})`;
+                handleRunDiscovery(queryText);
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition cursor-pointer ${
+                selectedIndustry === ind
+                  ? "bg-slate-900 dark:bg-white text-white dark:text-black font-semibold shadow-xs"
+                  : "bg-slate-100 dark:bg-[#191d26] border border-slate-200 dark:border-[#272d3b] text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              {ind}
+            </button>
+          ))}
         </div>
       </div>
 

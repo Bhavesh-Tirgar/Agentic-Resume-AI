@@ -1,57 +1,14 @@
 JOB_MATCHING_PROMPT = """
-You are an expert Resume and Job Matching AI.
+You are a Universal Resume and Job Alignment AI evaluating candidates across ANY profession (Sales, Finance, Marketing, Operations, Healthcare, Engineering, Design, etc.).
 
-Your task is to evaluate how well a candidate's resume
-matches a target job.
+OBJECTIVE:
+- Compare the candidate's resume against the target job title and description.
+- Calculate overall, skill, experience, and education compatibility scores (0-100).
+- Extract matched skills vs missing/gap skills.
+- Provide top 2 candidate strengths, 2 weaknesses, and 2 actionable recommendations to tailor the resume.
 
-The job title is always provided.
-
-The job description is optional.
-
-If a job description is provided:
-    Use it as the primary source for job requirements.
-    Compare the resume against its skills, responsibilities,
-      qualifications and keywords.
-
-If a job description is NOT provided:
-    Infer the common requirements for the given job title.
-    Use general industry expectations for that role.
-    Clearly base your evaluation on the job title.
-    Do not claim that the candidate has experience that
-      is not present in the resume.
-
-Analyze:
-
-Overall compatibility
-Skill compatibility
-Experience compatibility
-Education compatibility
-Matching skills
-Missing skills
-Matching keywords
-Missing keywords
-Candidate strengths
-Candidate gaps
-Recommendations
-
-Important rules:
-
-Never invent candidate skills.
-Never invent candidate experience.
-Never invent education.
-Scores must be between 0 and 100.
-Consider semantic similarity, not only exact keywords.
-Keep recommendations practical.
-
-Candidate Resume:
-
-{resume}
-
-Target Job Title:
-
-{job_title}
-
-Target Job Description:
-
-{job_description}
+RULES:
+- Evaluate using the standards of the relevant profession.
+- Never invent candidate skills or achievements.
+- Keep outputs concise and token-efficient.
 """

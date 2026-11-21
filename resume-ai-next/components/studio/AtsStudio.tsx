@@ -95,7 +95,8 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
             databases: (backendParsed.skills || []).filter((s: string) => ["PostgreSQL", "Redis", "SQLite", "MongoDB"].includes(s)).length
               ? (backendParsed.skills || []).filter((s: string) => ["PostgreSQL", "Redis", "SQLite", "MongoDB"].includes(s))
               : ["PostgreSQL", "Redis", "SQLite"],
-            devops: ["Docker", "Git", "GitHub Actions", "Linux"]
+            devops: ["Docker", "Git", "GitHub Actions", "Linux"],
+            all_extracted: backendParsed.skills?.length ? backendParsed.skills : undefined,
           },
           detected_languages: backendParsed.languages?.length ? backendParsed.languages : ["English", "Hindi"],
           experience: backendParsed.experience?.length ? backendParsed.experience.map((e: any) => ({
@@ -227,66 +228,87 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
         {/* Left Column: Parsed Technical Dossier (7 Cols) */}
         <div className="lg:col-span-7 space-y-6">
           
-          {/* Extracted Technical Competencies */}
+          {/* Extracted Core Competencies & Domain Tools */}
           <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 shadow-sm transition-colors">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
                 <Layers className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Extracted Technical Competencies</span>
+                <span>Extracted Core Competencies & Domain Tools</span>
               </h2>
               <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500">
-                {parsed_data.skills.languages.length + parsed_data.skills.frameworks.length + parsed_data.skills.databases.length} Keywords Parsed
+                {parsed_data.skills.all_extracted?.length || (parsed_data.skills.languages.length + parsed_data.skills.frameworks.length + parsed_data.skills.databases.length)} Keywords Parsed
               </span>
             </div>
 
             <div className="space-y-4 text-xs">
-              <div>
-                <span className="text-slate-400 dark:text-zinc-500 text-[11px] uppercase font-mono block mb-1.5">
-                  Languages & Core
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {parsed_data.skills.languages.map((skill, i) => (
-                    <span 
-                      key={i} 
-                      className="px-2.5 py-1 rounded bg-slate-100 dark:bg-[#171b24] border border-slate-200 dark:border-[#232936] text-slate-700 dark:text-zinc-300 font-mono text-[11px]"
-                    >
-                      {skill}
-                    </span>
-                  ))}
+              {parsed_data.skills.all_extracted && parsed_data.skills.all_extracted.length > 0 ? (
+                <div>
+                  <span className="text-slate-400 dark:text-zinc-500 text-[11px] uppercase font-mono block mb-2">
+                    Verified Industry Keywords & Stack
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {parsed_data.skills.all_extracted.map((skill, i) => (
+                      <span 
+                        key={i} 
+                        className="px-2.5 py-1 rounded bg-slate-100 dark:bg-[#171b24] border border-slate-200 dark:border-[#232936] text-slate-800 dark:text-zinc-200 font-mono text-[11px] flex items-center gap-1.5"
+                      >
+                        <span className="text-emerald-500 text-[10px]">●</span>
+                        <span>{skill}</span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div>
+                    <span className="text-slate-400 dark:text-zinc-500 text-[11px] uppercase font-mono block mb-1.5">
+                      Core Disciplines & Methodologies
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {parsed_data.skills.languages.map((skill, i) => (
+                        <span 
+                          key={i} 
+                          className="px-2.5 py-1 rounded bg-slate-100 dark:bg-[#171b24] border border-slate-200 dark:border-[#232936] text-slate-700 dark:text-zinc-300 font-mono text-[11px]"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
 
-              <div>
-                <span className="text-slate-400 dark:text-zinc-500 text-[11px] uppercase font-mono block mb-1.5">
-                  Frameworks & Multi-Agent AI
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {parsed_data.skills.frameworks.map((skill, i) => (
-                    <span 
-                      key={i} 
-                      className="px-2.5 py-1 rounded bg-slate-100 dark:bg-[#171b24] border border-slate-200 dark:border-[#232936] text-slate-700 dark:text-zinc-300 font-mono text-[11px]"
-                    >
-                      {skill}
+                  <div>
+                    <span className="text-slate-400 dark:text-zinc-500 text-[11px] uppercase font-mono block mb-1.5">
+                      Platforms & Domain Applications
                     </span>
-                  ))}
-                </div>
-              </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {parsed_data.skills.frameworks.map((skill, i) => (
+                        <span 
+                          key={i} 
+                          className="px-2.5 py-1 rounded bg-slate-100 dark:bg-[#171b24] border border-slate-200 dark:border-[#232936] text-slate-700 dark:text-zinc-300 font-mono text-[11px]"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
 
-              <div>
-                <span className="text-slate-400 dark:text-zinc-500 text-[11px] uppercase font-mono block mb-1.5">
-                  Database & Infrastructure
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {[...parsed_data.skills.databases, ...parsed_data.skills.devops].map((skill, i) => (
-                    <span 
-                      key={i} 
-                      className="px-2.5 py-1 rounded bg-slate-100 dark:bg-[#171b24] border border-slate-200 dark:border-[#232936] text-slate-700 dark:text-zinc-300 font-mono text-[11px]"
-                    >
-                      {skill}
+                  <div>
+                    <span className="text-slate-400 dark:text-zinc-500 text-[11px] uppercase font-mono block mb-1.5">
+                      Tools & Operations
                     </span>
-                  ))}
-                </div>
-              </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[...parsed_data.skills.databases, ...parsed_data.skills.devops].map((skill, i) => (
+                        <span 
+                          key={i} 
+                          className="px-2.5 py-1 rounded bg-slate-100 dark:bg-[#171b24] border border-slate-200 dark:border-[#232936] text-slate-700 dark:text-zinc-300 font-mono text-[11px]"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

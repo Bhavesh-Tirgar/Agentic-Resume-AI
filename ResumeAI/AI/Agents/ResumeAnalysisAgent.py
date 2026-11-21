@@ -66,9 +66,7 @@ class ResumeAnalysisAgent:
 
         result = self.chain.invoke(
             {
-                "resume": resume.model_dump_json(
-                    indent=2
-                )
+                "resume": resume.model_dump_json(exclude_defaults=True)
             },
             config={
                     "callbacks": [token_counter]

@@ -23,6 +23,7 @@ export interface CandidateDossier {
     frameworks: string[];
     databases: string[];
     devops: string[];
+    all_extracted?: string[];
   };
   detected_languages?: string[];
   experience: {
@@ -158,8 +159,9 @@ export const INITIAL_DOSSIER: AtsResultData = {
 export const JOB_ROLES_PRESETS = [
   {
     id: "backend-ai",
-    title: "Senior AI & Systems Engineer",
-    company: "Series B Distributed AI Startup",
+    title: "Senior Software & AI Systems Engineer",
+    company: "Distributed Tech Solutions",
+    category: "Technology",
     description: `We are looking for a Senior Systems & AI Engineer to build durable agentic workflows and low-latency backend infrastructure.
 Requirements:
 - 4+ years experience in Python, Django REST Framework, or FastAPI.
@@ -169,24 +171,52 @@ Requirements:
 - Experience with containerization (Docker) and CI/CD pipelines.`
   },
   {
-    id: "distributed-staff",
-    title: "Staff Distributed Systems Engineer",
-    company: "Tier-1 Cloud Infrastructure",
-    description: `Seeking a Staff Systems Engineer to design high-throughput stream processing and fault-tolerant distributed services.
+    id: "sales-executive",
+    title: "Senior Enterprise B2B Account Executive",
+    company: "Adani Wilmar Commercial / Enterprise Growth",
+    category: "Sales & Business",
+    description: `Seeking an experienced Enterprise Account Executive to manage high-yield corporate sales cycles and accelerate revenue.
 Requirements:
-- Mastery of distributed consensus, event-driven architectures (Kafka / RabbitMQ), and Go or Python.
-- Strong knowledge of Linux networking, p99 latency optimization, and concurrency primitives.
-- Track record of leading architectural design reviews and mentoring senior engineers.`
+- 4+ years in B2B corporate sales, key account management, or commercial software sales.
+- Proven track record of consistently exceeding quarterly quotas (>115% attainment).
+- Expertise in Salesforce CRM, pipeline forecasting, contract negotiation, and stakeholder presentations.
+- Experience managing multi-decision-maker sales cycles with average deal size >₹25 Lakhs.`
   },
   {
-    id: "fullstack-lead",
-    title: "Lead Full Stack Engineer (Next.js + Python)",
-    company: "Fintech Platform",
-    description: `Looking for a hands-on Lead Engineer to bridge high-performance frontend interfaces with hardened Python backend services.
+    id: "financial-analyst",
+    title: "Senior Financial Analyst & Corporate Controller",
+    company: "GIFT City FinHub / Global Advisory",
+    category: "Finance & Accounting",
+    description: `Looking for a Senior Financial Analyst to lead corporate financial modeling, statutory audit compliance, and budget variance.
 Requirements:
-- Strong production experience with Next.js 14/15 (App Router), TypeScript, and Tailwind CSS.
-- Robust Python backend architecture (DRF, FastAPI, Celery, PostgreSQL).
-- Experience leading architectural roadmaps and automated test verification.`
+- CA, MBA Finance, or B.Com with 4+ years in corporate finance, auditing, or commercial banking.
+- Strong mastery of Financial Modeling, GAAP/IFRS standards, Balance Sheet reconciliations, and P&L reporting.
+- Advanced proficiency in Excel (VBA/macros), TallyPrime, or SAP ERP Financials.
+- Exceptional analytical rigor delivering board-level capital allocation decks.`
+  },
+  {
+    id: "growth-marketing",
+    title: "Lead Digital Marketing & Growth Strategist",
+    company: "Dentsu Creative / BrandPulse Media",
+    category: "Marketing & Growth",
+    description: `Seeking an analytical Growth Marketer to drive omni-channel acquisition and scale paid/organic customer funnels.
+Requirements:
+- 3+ years managing multi-channel digital campaigns across Google Ads, Meta Ads Manager, and SEO.
+- Deep expertise in Conversion Rate Optimization (CRO), Google Analytics 4, and attribution modeling.
+- Demonstrated success scaling customer acquisition with declining Customer Acquisition Cost (CAC) and high ROAS.
+- Strong copywriting and creative A/B testing methodology.`
+  },
+  {
+    id: "operations-lead",
+    title: "Operations & Supply Chain Logistics Manager",
+    company: "Apex Supply Network / Blue Dart Logistics",
+    category: "Operations & Logistics",
+    description: `Hiring an Operations Manager to streamline warehouse fulfillment, vendor contracts, and logistics operations.
+Requirements:
+- 4+ years in supply chain operations, fleet logistics, procurement, or inventory management.
+- Demonstrated track record reducing fulfillment turnaround time and vendor procurement costs.
+- Experience with ERP/WMS systems, SLA governance, and cross-departmental coordination.
+- Strong focus on process safety, regulatory compliance, and cost efficiency.`
   }
 ];
 

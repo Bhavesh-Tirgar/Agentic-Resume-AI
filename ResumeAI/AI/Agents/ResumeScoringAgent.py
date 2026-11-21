@@ -69,12 +69,8 @@ class ResumeScoringAgent:
             
             result = self.chain.invoke(
                 {
-                    "resume": resume.model_dump_json(
-                        indent=2
-                    ),
-                    "analysis": analysis.model_dump_json(
-                        indent=2
-                    )
+                    "resume": resume.model_dump_json(exclude_defaults=True),
+                    "analysis": analysis.model_dump_json(exclude_defaults=True)
                 },
                 config={
                     "callbacks": [token_counter]
