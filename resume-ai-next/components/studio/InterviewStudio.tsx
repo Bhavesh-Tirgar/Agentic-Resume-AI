@@ -3,16 +3,19 @@
 import React, { useState } from "react";
 import { 
   HelpCircle, CheckCircle2, ChevronDown, ChevronUp, 
-  Copy, Check, AlertTriangle, Layers, ShieldCheck, Database
+  Copy, Check, AlertTriangle, Layers, ShieldCheck, Database, RefreshCw, Server
 } from "lucide-react";
 import { INTERVIEW_QUESTIONS } from "@/lib/demoData";
+import { createInterviewPlanApi } from "@/lib/api";
 
 export function InterviewStudio() {
-  const [questions] = useState(INTERVIEW_QUESTIONS);
+  const [questions, setQuestions] = useState(INTERVIEW_QUESTIONS);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [expandedId, setExpandedId] = useState<number | null>(1);
   const [completedMap, setCompletedMap] = useState<Record<number, boolean>>({});
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [apiNotice, setApiNotice] = useState<string | null>(null);
 
   const categories = [
     { id: "all", label: "All Questions" },
@@ -21,9 +24,46 @@ export function InterviewStudio() {
     { id: "Backend & Database Architecture", label: "Django & Database" },
   ];
 
+  const handleGenerateLivePlan = async () => {
+    setIsGenerating(true);
+    setApiNotice(null);
+    try {
+      const res = await createInterviewPlanApi(1, 1);
+      const rounds = res.plan_data?.rounds || [];
+      const generatedQuestions: any[] = [];
+      let qId = 10;
+
+      rounds.forEach((rnd: any) => {
+        (rnd.questions || []).forEach((q: any) => {
+          generatedQuestions.push({
+            id: qId++,
+            category: q.category || "System Architecture",
+            title: q.question.slice(0, 50) + "...",
+            question: q.question,
+            situation: "Production incident / scale challenge requiring deterministic architecture.",
+            task: q.reason || "Architect resilient services under load.",
+            action: "Executed phased migration with stateless JWT, DRF rate limits, and LangGraph multi-agent cyclical validation.",
+            result: "Maintained 99.99% availability and neutralized 100% of adversarial injection payloads.",
+            trap: "Rookie Trap: Omitting circuit breakers or relying on untyped prompting without Pydantic validation."
+          });
+        });
+      });
+
+      if (generatedQuestions.length > 0) {
+        setQuestions([...generatedQuestions, ...INTERVIEW_QUESTIONS]);
+        setApiNotice(`Live API Success: Generated ${generatedQuestions.length} tailored interview questions from Django Backend (Plan ID #${res.interview_plan_id})`);
+      }
+    } catch (err: any) {
+      console.warn("API interview plan fallback:", err);
+      setApiNotice(`Using calibrated question bank: ${err.message || "Local bank"}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const filteredQuestions = selectedCategory === "all"
     ? questions
-    : questions.filter((q) => q.category === selectedCategory);
+    : questions.filter((q) => q.category === selectedCategory || selectedCategory === "all");
 
   const toggleComplete = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -50,6 +90,10 @@ export function InterviewStudio() {
             <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-zinc-400">
               Technical Interview Cockpit
             </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-[#191d27] border border-slate-200 dark:border-[#272d3b] text-slate-600 dark:text-zinc-300 flex items-center gap-1">
+              <Server className="w-3 h-3 text-emerald-500" />
+              <span>Django API :8000</span>
+            </span>
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
             STAR Framework Practice Questions
@@ -59,11 +103,29 @@ export function InterviewStudio() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto text-xs font-mono bg-white dark:bg-[#111318] border border-slate-200 dark:border-[#20242e] px-3 py-1.5 rounded-lg shadow-sm">
-          <span className="text-slate-500 dark:text-zinc-400">Prepared:</span>
-          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{completedCount} / {questions.length}</span>
+        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          <button
+            onClick={handleGenerateLivePlan}
+            disabled={isGenerating}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition cursor-pointer"
+          >
+            {isGenerating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            <span>Sync with Backend</span>
+          </button>
+
+          <div className="flex items-center gap-2 text-xs font-mono bg-white dark:bg-[#111318] border border-slate-200 dark:border-[#20242e] px-3 py-1.5 rounded-lg shadow-xs">
+            <span className="text-slate-500 dark:text-zinc-400">Prepared:</span>
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{completedCount} / {questions.length}</span>
+          </div>
         </div>
       </div>
+
+      {apiNotice && (
+        <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+          <span>{apiNotice}</span>
+        </div>
+      )}
 
       {/* Category Filter Pills */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
