@@ -1,5 +1,5 @@
 /**
- * Full-Featured API Client for Agentic Resume AI
+ * Full-Featured Resilient API Client for Agentic Resume AI
  * Connects Next.js Frontend directly to Django REST Framework backend on http://localhost:8000/api
  */
 
@@ -23,23 +23,16 @@ export const removeAuthToken = () => {
 };
 
 /**
- * Ensure active authentication session. If no token exists, automatically
- * initializes a guest account session with Django backend.
+ * Logs in or registers guest session to acquire fresh JWT token
  */
-export async function ensureAuthenticatedSession(): Promise<string> {
-  const existing = getAuthToken();
-  if (existing) {
-    return existing;
-  }
-
-  // Create or login default guest session
+async function acquireFreshToken(): Promise<string> {
   const guestUser = {
     username: "guest_architect",
     password: "Password123!",
   };
 
   try {
-    // Attempt login
+    // 1. Try login
     const res = await fetch(`${API_BASE}/auth/token/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,55 +41,99 @@ export async function ensureAuthenticatedSession(): Promise<string> {
 
     if (res.ok) {
       const data = await res.json();
-      setAuthToken(data.access);
-      return data.access;
+      if (data.access) {
+        setAuthToken(data.access);
+        return data.access;
+      }
     }
 
-    // If login fails, register and obtain token
+    // 2. If login failed, register and login
     await fetch(`${API_BASE}/auth/register/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...guestUser, email: "guest@resumeai.internal" }),
     });
 
-    const retryRes = await fetch(`${API_BASE}/auth/token/`, {
+    const retry = await fetch(`${API_BASE}/auth/token/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(guestUser),
     });
 
-    if (retryRes.ok) {
-      const data = await retryRes.json();
-      setAuthToken(data.access);
-      return data.access;
+    if (retry.ok) {
+      const data = await retry.json();
+      if (data.access) {
+        setAuthToken(data.access);
+        return data.access;
+      }
     }
   } catch (err) {
-    console.warn("Backend auth connection offline. Using local session fallback.", err);
+    console.warn("Backend auth unreachable:", err);
   }
 
   return "";
 }
 
-const getHeaders = async (isFormData = false): Promise<HeadersInit> => {
-  const token = await ensureAuthenticatedSession();
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+/**
+ * Ensures valid token, retrieving from storage or fetching fresh
+ */
+export async function ensureAuthenticatedSession(): Promise<string> {
+  const existing = getAuthToken();
+  if (existing) {
+    return existing;
   }
-  if (!isFormData) {
-    headers["Content-Type"] = "application/json";
+  return acquireFreshToken();
+}
+
+/**
+ * Universal fetch wrapper that automatically catches 401 Unauthorized,
+ * wipes the invalid/expired token from localStorage, obtains a fresh token,
+ * and retries the request once. Eliminates permanent 401 locks!
+ */
+export async function fetchWithAuth(
+  endpoint: string,
+  options: RequestInit = {},
+  isFormData = false
+): Promise<Response> {
+  let token = await ensureAuthenticatedSession();
+
+  const buildHeaders = (tok: string): HeadersInit => {
+    const h: Record<string, string> = {};
+    if (tok) {
+      h["Authorization"] = `Bearer ${tok}`;
+    }
+    if (!isFormData) {
+      h["Content-Type"] = "application/json";
+    }
+    return { ...h, ...(options.headers as Record<string, string> || {}) };
+  };
+
+  const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
+  let res = await fetch(url, {
+    ...options,
+    headers: buildHeaders(token),
+  });
+
+  // If 401 Unauthorized, token expired or corrupted: refresh and retry
+  if (res.status === 401) {
+    removeAuthToken();
+    token = await acquireFreshToken();
+    if (token) {
+      res = await fetch(url, {
+        ...options,
+        headers: buildHeaders(token),
+      });
+    }
   }
-  return headers;
-};
+
+  return res;
+}
 
 // 1. Health & Connection Check
 export async function checkBackendHealth(): Promise<{ status: "connected" | "offline"; message?: string }> {
   try {
-    const res = await fetch(`${API_BASE}/resume/`, {
-      method: "GET",
-      headers: await getHeaders(),
-    });
-    if (res.status === 200 || res.status === 401) {
+    const res = await fetchWithAuth("/resume/", { method: "GET" });
+    if (res.status === 200) {
       return { status: "connected" };
     }
     return { status: "offline", message: `HTTP ${res.status}` };
@@ -115,14 +152,14 @@ export async function uploadResumeApi(file: File): Promise<{
   const formData = new FormData();
   formData.append("resume_file", file);
 
-  const token = await ensureAuthenticatedSession();
-  const res = await fetch(`${API_BASE}/resume/upload/`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
+  const res = await fetchWithAuth(
+    "/resume/upload/",
+    {
+      method: "POST",
+      body: formData,
     },
-    body: formData,
-  });
+    true
+  );
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -134,10 +171,8 @@ export async function uploadResumeApi(file: File): Promise<{
 
 // 3. Process Resume with Multi-Agent Engine
 export async function processResumeApi(resumeId: number): Promise<any> {
-  const headers = await getHeaders();
-  const res = await fetch(`${API_BASE}/ai/resume-process/${resumeId}/`, {
+  const res = await fetchWithAuth(`/ai/resume-process/${resumeId}/`, {
     method: "POST",
-    headers,
   });
 
   if (!res.ok) {
@@ -150,10 +185,8 @@ export async function processResumeApi(resumeId: number): Promise<any> {
 
 // 4. Retrieve Existing Processed Resume Results
 export async function getResumeProcessResultApi(resumeId: number): Promise<any> {
-  const headers = await getHeaders();
-  const res = await fetch(`${API_BASE}/ai/resume-process/${resumeId}/`, {
+  const res = await fetchWithAuth(`/ai/resume-process/${resumeId}/`, {
     method: "GET",
-    headers,
   });
 
   if (!res.ok) {
@@ -173,10 +206,8 @@ export async function matchJobApi(
   job_match_id: number;
   match_data: any;
 }> {
-  const headers = await getHeaders();
-  const res = await fetch(`${API_BASE}/ai/resume/${resumeId}/job-match/`, {
+  const res = await fetchWithAuth(`/ai/resume/${resumeId}/job-match/`, {
     method: "POST",
-    headers,
     body: JSON.stringify({
       job_title: jobTitle,
       job_description: jobDescription,
@@ -200,12 +231,10 @@ export async function createInterviewPlanApi(
   interview_plan_id: number;
   plan_data: any;
 }> {
-  const headers = await getHeaders();
-  const res = await fetch(
-    `${API_BASE}/ai/resume/${resumeId}/job-match/${jobMatchId}/interview-plan/`,
+  const res = await fetchWithAuth(
+    `/ai/resume/${resumeId}/job-match/${jobMatchId}/interview-plan/`,
     {
       method: "POST",
-      headers,
     }
   );
 
@@ -219,19 +248,12 @@ export async function createInterviewPlanApi(
 
 // 7. List User Resumes
 export async function listUserResumesApi(): Promise<any[]> {
-  const headers = await getHeaders();
-  const res = await fetch(`${API_BASE}/resume/`, {
-    method: "GET",
-    headers,
-  });
-
+  const res = await fetchWithAuth("/resume/", { method: "GET" });
   if (!res.ok) {
     return [];
   }
-
   return res.json();
 }
-
 
 // 8. Active Resume ID Persistence
 export const getActiveResumeId = (): number => {
@@ -258,10 +280,8 @@ export async function discoverJobsApi(
   work_type: string;
   discovery_data: any;
 }> {
-  const headers = await getHeaders();
-  const res = await fetch(`${API_BASE}/ai/resume/${resumeId}/job-finder/`, {
+  const res = await fetchWithAuth(`/ai/resume/${resumeId}/job-finder/`, {
     method: "POST",
-    headers,
     body: JSON.stringify({
       location,
       work_type: workType,
@@ -277,10 +297,8 @@ export async function discoverJobsApi(
 }
 
 export async function getDiscoveredJobsApi(resumeId: number): Promise<any> {
-  const headers = await getHeaders();
-  const res = await fetch(`${API_BASE}/ai/resume/${resumeId}/job-finder/`, {
+  const res = await fetchWithAuth(`/ai/resume/${resumeId}/job-finder/`, {
     method: "GET",
-    headers,
   });
 
   if (!res.ok) {
