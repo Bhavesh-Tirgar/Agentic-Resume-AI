@@ -5,14 +5,24 @@ import { Navbar } from "@/components/sections/Navbar";
 import { FaqAndFooter } from "@/components/sections/FaqAndFooter";
 import { AtsStudio } from "@/components/studio/AtsStudio";
 import { useRouter } from "next/navigation";
-import { setActiveResumeId as saveActiveResumeId } from "@/lib/api";
+import { setActiveResumeId as saveActiveResumeId, getActiveResumeId } from "@/lib/api";
 
 export default function StudioPage() {
   const router = useRouter();
+  const [activeResumeId, setActiveResumeId] = useState<number>(1);
+
+  useEffect(() => {
+    setActiveResumeId(getActiveResumeId());
+  }, []);
 
   const handleTabChange = (tab: string) => {
     if (tab === "overview") router.push("/");
     else router.push(`/${tab}`);
+  };
+
+  const handleResumeUploaded = (id: number) => {
+    setActiveResumeId(id);
+    saveActiveResumeId(id);
   };
 
   return (
@@ -24,9 +34,10 @@ export default function StudioPage() {
       />
       <div className="flex-1 pt-20">
         <AtsStudio
+          activeResumeId={activeResumeId}
           onNavigateToMatch={() => router.push("/matcher")}
           onNavigateToInterview={() => router.push("/interview")}
-          onResumeUploaded={(id) => saveActiveResumeId(id)}
+          onResumeUploaded={handleResumeUploaded}
         />
         <FaqAndFooter />
       </div>

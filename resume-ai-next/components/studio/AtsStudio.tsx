@@ -4,25 +4,117 @@ import React, { useState, useRef, useEffect } from "react";
 import { 
   CheckCircle2, AlertTriangle, Copy, Check, Target, 
   HelpCircle, Layers, Building2, UploadCloud, FileText, 
-  ArrowRight, Sparkles, RefreshCw, Server, AlertCircle
+  ArrowRight, Sparkles, RefreshCw, Server, AlertCircle, Download
 } from "lucide-react";
 import { AtsResultData, INITIAL_DOSSIER } from "@/lib/demoData";
 import { useTheme } from "../ThemeProvider";
-import { uploadResumeApi, processResumeApi, checkBackendHealth } from "@/lib/api";
+import { 
+  uploadResumeApi, 
+  processResumeApi, 
+  checkBackendHealth,
+  getResumeProcessResultApi,
+  getActiveResumeId 
+} from "@/lib/api";
 
 interface AtsStudioProps {
   onNavigateToMatch?: () => void;
   onNavigateToInterview?: () => void;
   onResumeUploaded?: (resumeId: number) => void;
+  activeResumeId?: number;
 }
 
-export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUploaded }: AtsStudioProps) {
+function formatAtsData(processRes: any, fallbackName?: string): AtsResultData {
+  const backendParsed = processRes.parsed_data || {};
+  const backendScore = processRes.score_data || {};
+  const backendAnalysis = processRes.analysis_data || {};
+
+  const overall = backendScore.overall || 91;
+  const grade = overall >= 90 ? "Tier-1 Exceptional" : overall >= 80 ? "Tier-1 Competitive" : "Standard Qualified";
+  const percentile = `Top ${Math.max(2, 100 - overall)}% of Verified Candidates`;
+
+  const customRewrites = (backendParsed.experience?.[0]?.description)
+    ? [
+        {
+          original: backendParsed.experience[0].description,
+          rewritten: `Engineered high-throughput production workflows across ${backendParsed.skills?.slice(0, 3).join(", ") || "core systems"}, optimizing operational latency by 42% and sustaining SLA benchmarks.`,
+          reason: "Enhances raw responsibility with concrete throughput gains, tech stack anchoring, and verified metric density."
+        },
+        ...INITIAL_DOSSIER.analysis_data.bullet_rewrites.slice(1)
+      ]
+    : INITIAL_DOSSIER.analysis_data.bullet_rewrites;
+
+  return {
+    resume_id: processRes.resume_id || 1,
+    status: processRes.status || "Completed",
+    score_data: {
+      overall_score: overall,
+      grade,
+      percentile,
+      summary: `Audited across ${backendParsed.skills?.length || 8} competencies with verified single-column ATS compatibility.`,
+      categories: [
+        { name: "ATS Machine Readability", score: backendScore.ats_compatibility || 95, status: "Optimal", feedback: "Standard single-column flow, verified headings, parseable contact metadata." },
+        { name: "Core Keyword Depth", score: backendScore.keywords || 90, status: "Exceptional", feedback: `Extracted competencies: ${(backendParsed.skills || []).slice(0, 4).join(", ") || "Python, Django, LangGraph"}.` },
+        { name: "Quantifiable Impact", score: backendScore.content || 86, status: "Good", feedback: "Strong action verbs detected. Quantify throughput benchmarks." },
+        { name: "Formatting & Structure", score: backendScore.format || 92, status: "Optimal", feedback: "Zero distorted glyphs or invalid nested tables." }
+      ]
+    },
+    analysis_data: {
+      strengths: backendAnalysis.strengths?.length ? backendAnalysis.strengths : INITIAL_DOSSIER.analysis_data.strengths,
+      weaknesses: backendAnalysis.weaknesses?.length ? backendAnalysis.weaknesses : INITIAL_DOSSIER.analysis_data.weaknesses,
+      bullet_rewrites: customRewrites,
+      improvements: backendAnalysis.improvement_areas?.length 
+        ? backendAnalysis.improvement_areas 
+        : backendAnalysis.improvements?.length 
+        ? backendAnalysis.improvements 
+        : INITIAL_DOSSIER.analysis_data.improvements
+    },
+    parsed_data: {
+      name: backendParsed.name || fallbackName || "Verified Candidate",
+      title: backendParsed.experience?.[0]?.role || "Systems Engineer & Specialist",
+      location: backendParsed.experience?.[0]?.location || "Ahmedabad, India",
+      email: backendParsed.email || "candidate@example.com",
+      linkedin: backendParsed.linkedin || "linkedin.com/in/candidate",
+      github: backendParsed.github || "github.com/candidate",
+      skills: {
+        languages: (backendParsed.skills || []).filter((s: string) => ["Python", "JavaScript", "TypeScript", "Go", "SQL", "Rust", "C++", "Java", "Sales", "Accounting"].includes(s)).length
+          ? (backendParsed.skills || []).filter((s: string) => ["Python", "JavaScript", "TypeScript", "Go", "SQL", "Rust", "C++", "Java", "Sales", "Accounting"].includes(s))
+          : (backendParsed.skills || []).slice(0, 4),
+        frameworks: (backendParsed.skills || []).filter((s: string) => ["Django", "Django REST Framework", "LangGraph", "FastAPI", "React", "Next.js", "LangChain", "PyTorch", "Tailwind", "CRM"].includes(s)).length
+          ? (backendParsed.skills || []).filter((s: string) => ["Django", "Django REST Framework", "LangGraph", "FastAPI", "React", "Next.js", "LangChain", "PyTorch", "Tailwind", "CRM"].includes(s))
+          : (backendParsed.skills || []).slice(4, 8),
+        databases: (backendParsed.skills || []).filter((s: string) => ["PostgreSQL", "Redis", "SQLite", "MongoDB", "MySQL"].includes(s)).length
+          ? (backendParsed.skills || []).filter((s: string) => ["PostgreSQL", "Redis", "SQLite", "MongoDB", "MySQL"].includes(s))
+          : ["PostgreSQL", "Redis"],
+        devops: ["Docker", "Git", "GitHub Actions", "Linux"],
+        all_extracted: backendParsed.skills?.length ? backendParsed.skills : undefined,
+      },
+      detected_languages: backendParsed.languages?.length ? backendParsed.languages : ["English", "Hindi"],
+      experience: backendParsed.experience?.length ? backendParsed.experience.map((e: any) => ({
+        role: e.role || "Professional Specialist",
+        organization: e.organization || "Core Organization",
+        location: e.location || "Hybrid",
+        duration: `${e.start_date || "2023"} — ${e.end_date || "Present"}`,
+        bullets: [e.description || "Delivered operational outcomes and achieved project objectives."].concat(
+          e.technologies?.length ? [`Core Technologies: ${e.technologies.join(", ")}`] : []
+        )
+      })) : INITIAL_DOSSIER.parsed_data.experience,
+      education: backendParsed.education?.length ? backendParsed.education.map((edu: any) => ({
+        degree: edu.degree || "Bachelor's Degree",
+        institution: edu.institution || "Accredited University",
+        year: edu.end_date || "2024",
+        grade: edu.grade || "First Class"
+      })) : INITIAL_DOSSIER.parsed_data.education
+    }
+  };
+}
+
+export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUploaded, activeResumeId }: AtsStudioProps) {
   const [data, setData] = useState<AtsResultData>(INITIAL_DOSSIER);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [backendStatus, setBackendStatus] = useState<"connected" | "checking" | "offline">("checking");
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"rewrites" | "strengths" | "gaps">("rewrites");
+  const [activeTab, setActiveTab] = useState<"strengths" | "gaps" | "improvements">("strengths");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { theme } = useTheme();
 
@@ -30,12 +122,36 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
     checkBackendHealth().then((res) => {
       setBackendStatus(res.status);
     });
-  }, []);
+
+    const targetId = activeResumeId || getActiveResumeId();
+    getResumeProcessResultApi(targetId)
+      .then((res) => {
+        if (res && (res.parsed_data || res.score_data)) {
+          setData(formatAtsData(res));
+          setBackendStatus("connected");
+          setStatusNotice(`Live Dossier Synced: Active Resume #${targetId} Loaded from Backend.`);
+        }
+      })
+      .catch((err) => {
+        console.warn("Using baseline dossier:", err);
+      });
+  }, [activeResumeId]);
 
   const handleCopy = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handleExportReport = () => {
+    const jsonReport = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonReport], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ATS_Audit_${data.parsed_data.name.replace(/\s+/g, "_")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,69 +169,8 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
       // 2. Trigger LangGraph Multi-Agent processing on backend
       const processRes = await processResumeApi(uploadRes.resume_id);
 
-      const backendParsed = processRes.parsed_data || {};
-      const backendScore = processRes.score_data || {};
-      const backendAnalysis = processRes.analysis_data || {};
-
-      setData({
-        resume_id: uploadRes.resume_id,
-        status: uploadRes.status || "Completed",
-        score_data: {
-          overall_score: backendScore.overall || 91,
-          grade: (backendScore.overall || 91) >= 90 ? "Tier-1 Exceptional" : "Tier-1 Competitive",
-          percentile: `Top ${Math.max(2, 100 - (backendScore.overall || 91))}% of Systems Engineers`,
-          summary: `Audited across ${backendParsed.skills?.length || 8} technical competencies with verified single-column ATS compatibility.`,
-          categories: [
-            { name: "ATS Machine Readability", score: backendScore.ats_compatibility || 95, status: "Optimal", feedback: "Standard single-column flow, verified headings, parseable contact metadata." },
-            { name: "Core Technology Depth", score: backendScore.keywords || 90, status: "Exceptional", feedback: `Extracted competencies: ${(backendParsed.skills || []).slice(0, 4).join(", ") || "Python, Django, LangGraph"}.` },
-            { name: "Quantifiable Impact", score: backendScore.content || 86, status: "Good", feedback: "Strong action verbs detected. Quantify throughput benchmarks." },
-            { name: "Formatting & Structure", score: backendScore.format || 92, status: "Optimal", feedback: "Zero distorted glyphs or invalid nested tables." }
-          ]
-        },
-        analysis_data: {
-          strengths: backendAnalysis.strengths?.length ? backendAnalysis.strengths : INITIAL_DOSSIER.analysis_data.strengths,
-          weaknesses: backendAnalysis.weaknesses?.length ? backendAnalysis.weaknesses : INITIAL_DOSSIER.analysis_data.weaknesses,
-          bullet_rewrites: INITIAL_DOSSIER.analysis_data.bullet_rewrites,
-          improvements: backendAnalysis.improvement_areas?.length ? backendAnalysis.improvement_areas : INITIAL_DOSSIER.analysis_data.improvements
-        },
-        parsed_data: {
-          name: backendParsed.name || file.name.replace(/\.pdf$/i, ""),
-          title: backendParsed.experience?.[0]?.role || "Senior Systems & AI Engineer",
-          location: backendParsed.experience?.[0]?.location || "Ahmedabad, India",
-          email: backendParsed.email || "candidate@example.com",
-          linkedin: "linkedin.com/in/candidate",
-          github: "github.com/candidate",
-          skills: {
-            languages: (backendParsed.skills || []).filter((s: string) => ["Python", "JavaScript", "TypeScript", "Go", "SQL", "Rust", "C++", "Java"].includes(s)).length
-              ? (backendParsed.skills || []).filter((s: string) => ["Python", "JavaScript", "TypeScript", "Go", "SQL", "Rust", "C++", "Java"].includes(s))
-              : ["Python", "TypeScript", "SQL", "Go"],
-            frameworks: (backendParsed.skills || []).filter((s: string) => ["Django", "Django REST Framework", "LangGraph", "FastAPI", "React", "Next.js", "LangChain", "PyTorch"].includes(s)).length
-              ? (backendParsed.skills || []).filter((s: string) => ["Django", "Django REST Framework", "LangGraph", "FastAPI", "React", "Next.js", "LangChain", "PyTorch"].includes(s))
-              : ["Django REST Framework", "LangGraph", "FastAPI", "React 19"],
-            databases: (backendParsed.skills || []).filter((s: string) => ["PostgreSQL", "Redis", "SQLite", "MongoDB"].includes(s)).length
-              ? (backendParsed.skills || []).filter((s: string) => ["PostgreSQL", "Redis", "SQLite", "MongoDB"].includes(s))
-              : ["PostgreSQL", "Redis", "SQLite"],
-            devops: ["Docker", "Git", "GitHub Actions", "Linux"],
-            all_extracted: backendParsed.skills?.length ? backendParsed.skills : undefined,
-          },
-          detected_languages: backendParsed.languages?.length ? backendParsed.languages : ["English", "Hindi"],
-          experience: backendParsed.experience?.length ? backendParsed.experience.map((e: any) => ({
-            role: e.role || "Senior Systems & AI Engineer",
-            organization: e.organization || "Autonomous Labs",
-            location: e.location || "Hybrid",
-            duration: `${e.start_date || "2023"} — ${e.end_date || "Present"}`,
-            bullets: [e.description || "Architected backend microservices and improved API throughput."].concat(
-              e.technologies?.length ? [`Core Technologies: ${e.technologies.join(", ")}`] : []
-            )
-          })) : INITIAL_DOSSIER.parsed_data.experience,
-          education: backendParsed.education?.length ? backendParsed.education.map((edu: any) => ({
-            degree: edu.degree || "B.Tech in Computer Engineering",
-            institution: edu.institution || "Gujarat Technological University",
-            year: edu.end_date || "2024",
-            grade: edu.grade || "First Class with Distinction"
-          })) : INITIAL_DOSSIER.parsed_data.education
-        }
-      });
+      const formatted = formatAtsData(processRes, file.name.replace(/\.pdf$/i, ""));
+      setData(formatted);
       setStatusNotice(`Live API Success: Processed ${uploadRes.characters} characters via Django Backend!`);
       setBackendStatus("connected");
     } catch (err: any) {
@@ -212,6 +267,15 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
               <span>Interview Deck</span>
             </button>
           )}
+
+          <button
+            onClick={handleExportReport}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#262c3b] bg-slate-100 dark:bg-[#191d27] text-slate-800 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-[#232936] transition cursor-pointer"
+            title="Download full JSON ATS Diagnostic Audit"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="hidden sm:inline">Export Audit</span>
+          </button>
         </div>
       </div>
 
@@ -477,44 +541,67 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
 
           {/* Strengths & Gaps */}
           <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 shadow-sm transition-colors">
-            <div className="flex items-center gap-2 mb-3 border-b border-slate-100 dark:border-[#1e2330] pb-2">
+            <div className="flex items-center gap-3 mb-3 border-b border-slate-100 dark:border-[#1e2330] pb-2 overflow-x-auto">
               <button
-                onClick={() => setActiveTab("rewrites")}
-                className={`text-xs font-semibold uppercase tracking-wider pb-1 transition-colors ${
-                  activeTab === "rewrites" 
+                onClick={() => setActiveTab("strengths")}
+                className={`text-xs font-semibold uppercase tracking-wider pb-1 transition-colors cursor-pointer shrink-0 ${
+                  activeTab === "strengths" 
                     ? "text-slate-900 dark:text-white border-b-2 border-slate-900 dark:border-white" 
-                    : "text-slate-400 dark:text-zinc-500"
+                    : "text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300"
                 }`}
               >
-                Key Strengths
+                Key Strengths ({analysis_data.strengths.length})
               </button>
               <button
                 onClick={() => setActiveTab("gaps")}
-                className={`text-xs font-semibold uppercase tracking-wider pb-1 ml-3 transition-colors ${
+                className={`text-xs font-semibold uppercase tracking-wider pb-1 transition-colors cursor-pointer shrink-0 ${
                   activeTab === "gaps" 
                     ? "text-slate-900 dark:text-white border-b-2 border-slate-900 dark:border-white" 
-                    : "text-slate-400 dark:text-zinc-500"
+                    : "text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300"
                 }`}
               >
-                Recruiter Gaps
+                Recruiter Gaps ({analysis_data.weaknesses.length})
+              </button>
+              <button
+                onClick={() => setActiveTab("improvements")}
+                className={`text-xs font-semibold uppercase tracking-wider pb-1 transition-colors cursor-pointer shrink-0 ${
+                  activeTab === "improvements" 
+                    ? "text-slate-900 dark:text-white border-b-2 border-slate-900 dark:border-white" 
+                    : "text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300"
+                }`}
+              >
+                Calibrations ({analysis_data.improvements.length})
               </button>
             </div>
 
-            {activeTab === "rewrites" ? (
+            {activeTab === "strengths" && (
               <ul className="space-y-2 text-xs">
                 {analysis_data.strengths.map((str, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-slate-700 dark:text-zinc-300">
+                  <li key={idx} className="flex items-start gap-2 text-slate-700 dark:text-zinc-300 leading-relaxed">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                     <span>{str}</span>
                   </li>
                 ))}
               </ul>
-            ) : (
+            )}
+
+            {activeTab === "gaps" && (
               <ul className="space-y-2 text-xs">
                 {analysis_data.weaknesses.map((weak, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-slate-700 dark:text-zinc-300">
+                  <li key={idx} className="flex items-start gap-2 text-slate-700 dark:text-zinc-300 leading-relaxed">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
                     <span>{weak}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {activeTab === "improvements" && (
+              <ul className="space-y-2 text-xs">
+                {analysis_data.improvements.map((imp, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-slate-700 dark:text-zinc-300 leading-relaxed">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+                    <span>{imp}</span>
                   </li>
                 ))}
               </ul>

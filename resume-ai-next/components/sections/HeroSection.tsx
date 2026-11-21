@@ -15,14 +15,20 @@ import { luxuryEasing } from "@/lib/motion";
 interface HeroSectionProps {
   onScanClick?: () => void;
   onOpenStudio?: () => void;
+  onFileSelected?: (file: File) => void;
 }
 
-export function HeroSection({ onScanClick, onOpenStudio }: HeroSectionProps) {
+export function HeroSection({ onScanClick, onOpenStudio, onFileSelected }: HeroSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      if (onScanClick) onScanClick();
+      const file = e.target.files[0];
+      if (onFileSelected) {
+        onFileSelected(file);
+      } else if (onScanClick) {
+        onScanClick();
+      }
     }
   };
 

@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { 
   Target, CheckCircle2, AlertCircle, ArrowRight, 
-  Layers, FileText, Check, Sparkles, RefreshCw, HelpCircle, Server
+  Layers, FileText, Check, Sparkles, RefreshCw, HelpCircle, Server, Copy
 } from "lucide-react";
 import { JOB_ROLES_PRESETS, DEMO_JOB_MATCH_RESULT } from "@/lib/demoData";
-import { matchJobApi, getActiveResumeId } from "@/lib/api";
+import { matchJobApi, getActiveResumeId, getResumeProcessResultApi } from "@/lib/api";
 
 interface JobMatchStudioProps {
   activeResumeId?: number;
@@ -30,6 +30,8 @@ export function JobMatchStudio({
   const [matchResult, setMatchResult] = useState(DEMO_JOB_MATCH_RESULT);
   const [apiNotice, setApiNotice] = useState<string | null>(null);
   const [activeMatchId, setActiveMatchId] = useState<number>(1);
+  const [candidateInfo, setCandidateInfo] = useState<{ name: string; skillsCount: number } | null>(null);
+  const [copiedSummary, setCopiedSummary] = useState(false);
 
   // Sync if initialJobTitle changes
   useEffect(() => {
@@ -40,6 +42,28 @@ export function JobMatchStudio({
       }
     }
   }, [initialJobTitle, initialJobDescription]);
+
+  // Load candidate info
+  useEffect(() => {
+    const targetResumeId = activeResumeId || getActiveResumeId();
+    getResumeProcessResultApi(targetResumeId)
+      .then((res) => {
+        if (res.parsed_data?.name) {
+          setCandidateInfo({
+            name: res.parsed_data.name,
+            skillsCount: res.parsed_data.skills?.length || 0,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [activeResumeId]);
+
+  const handleCopySummary = () => {
+    const summary = `Job Alignment Report for "${jobTitle}":\nOverall Match: ${matchResult.overall_match_score}%\nSkill Match: ${matchResult.skill_match_score}%\nMatched Skills: ${matchResult.matched_skills.join(", ")}\nMissing Skills: ${matchResult.missing_skills.join(", ")}\nRecommendations:\n${matchResult.recommendations.map(r => "- " + r).join("\n")}`;
+    navigator.clipboard.writeText(summary);
+    setCopiedSummary(true);
+    setTimeout(() => setCopiedSummary(false), 2000);
+  };
 
   const handleSelectPreset = (presetId: string) => {
     setSelectedPreset(presetId);
@@ -95,6 +119,11 @@ export function JobMatchStudio({
               <Server className="w-3 h-3 text-emerald-500" />
               <span>Django API :8000</span>
             </span>
+            {candidateInfo && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                Candidate: {candidateInfo.name} ({candidateInfo.skillsCount} skills)
+              </span>
+            )}
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
             Job Description Alignment & Gap Engine
@@ -104,15 +133,26 @@ export function JobMatchStudio({
           </p>
         </div>
 
-        {onStartInterview && (
+        <div className="flex items-center gap-2 self-start md:self-auto">
           <button
-            onClick={() => onStartInterview(activeMatchId)}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition cursor-pointer self-start md:self-auto"
+            onClick={handleCopySummary}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#272d3b] bg-white dark:bg-[#111318] text-slate-800 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-[#191d27] transition cursor-pointer"
+            title="Copy match evaluation summary to clipboard"
           >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>Interview Prep Cockpit</span>
+            {copiedSummary ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copiedSummary ? "Copied" : "Copy Report"}</span>
           </button>
-        )}
+
+          {onStartInterview && (
+            <button
+              onClick={() => onStartInterview(activeMatchId)}
+              className="flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition cursor-pointer"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Interview Prep Cockpit</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {apiNotice && (

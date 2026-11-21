@@ -246,6 +246,28 @@ export async function createInterviewPlanApi(
   return res.json();
 }
 
+export async function getInterviewPlanApi(
+  resumeId: number,
+  jobMatchId: number
+): Promise<{
+  interview_plan_id: number;
+  plan_data: any;
+  created_at: string;
+}> {
+  const res = await fetchWithAuth(
+    `/ai/resume/${resumeId}/job-match/${jobMatchId}/interview-plan/`,
+    {
+      method: "GET",
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error("No existing interview plan found");
+  }
+
+  return res.json();
+}
+
 // 7. List User Resumes
 export async function listUserResumesApi(): Promise<any[]> {
   const res = await fetchWithAuth("/resume/", { method: "GET" });

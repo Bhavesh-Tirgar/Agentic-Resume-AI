@@ -5,13 +5,15 @@ import {
   UploadCloud, CheckCircle2, ShieldCheck, 
   ArrowRight, Copy, Check, RefreshCw, Server
 } from "lucide-react";
-import { uploadResumeApi, processResumeApi } from "@/lib/api";
+import { uploadResumeApi, processResumeApi, setActiveResumeId as saveActiveResumeId } from "@/lib/api";
 
 interface AtsScannerSectionProps {
   onOpenStudio?: () => void;
+  onResumeScanned?: (resumeId: number) => void;
+  initialFile?: File | null;
 }
 
-export function AtsScannerSection({ onOpenStudio }: AtsScannerSectionProps) {
+export function AtsScannerSection({ onOpenStudio, onResumeScanned, initialFile }: AtsScannerSectionProps) {
   const [dragActive, setDragActive] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
@@ -23,6 +25,13 @@ export function AtsScannerSection({ onOpenStudio }: AtsScannerSectionProps) {
     "Architected 14+ REST endpoints in DRF, cutting p99 latency to <45ms across 18k DAU."
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-scan if an initial file was passed
+  React.useEffect(() => {
+    if (initialFile) {
+      handleStartScan(initialFile);
+    }
+  }, [initialFile]);
 
   const steps = [
     { title: "Binary Validation", desc: "Verifying %PDF magic bytes on Django" },
@@ -46,10 +55,19 @@ export function AtsScannerSection({ onOpenStudio }: AtsScannerSectionProps) {
       if (file) {
         setActiveStep(3);
         const uploadRes = await uploadResumeApi(file);
+        saveActiveResumeId(uploadRes.resume_id);
+        onResumeScanned?.(uploadRes.resume_id);
+
         const processRes = await processResumeApi(uploadRes.resume_id);
         const score = processRes.score_data?.overall || 91;
         setScanScore(score);
         setScanStatus(score >= 90 ? "Tier-1 Screen Pass Verified" : "Competitive Candidate Profile");
+
+        if (processRes.analysis_data?.strengths?.length) {
+          setBulletSample(processRes.analysis_data.strengths[0]);
+        } else if (processRes.parsed_data?.name) {
+          setBulletSample(`Extracted competencies for ${processRes.parsed_data.name} with verified ATS single-column formatting.`);
+        }
       } else {
         setActiveStep(3);
         await new Promise((r) => setTimeout(r, 400));

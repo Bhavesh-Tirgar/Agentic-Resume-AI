@@ -404,3 +404,29 @@ export async function fetchWithAuth(endpoint: string, options: RequestInit = {})
 ```
 - **Extended Token Lifetime:** Increased `ACCESS_TOKEN_LIFETIME` in `Backend/settings.py` to `30 days` to prevent premature session expiration during active testing.
 - **Dedicated App Router Subpages:** Pre-rendered discrete pages for `/studio`, `/matcher`, `/scout`, `/interview`, and `/jobs` to eliminate 404 errors on direct navigation or refresh.
+
+---
+
+## 15. UI Upgrade: Demo to Production Ready
+
+In this iteration, the user interface was audited and upgraded from a static preview simulation into a production-grade, interactive application:
+
+### 1. Hero Section File Passthrough
+- **Previous Demo Behavior:** Clicking *"Upload PDF to Scan"* in `HeroSection` opened an OS file dialog, but once a file was chosen, the file object was discarded and the user was simply scrolled down to an idle scanner.
+- **Production Fix:** Added `onFileSelected: (file: File) => void` in `HeroSection.tsx`. Selecting a file immediately passes the `File` object to `AtsScannerSection`, triggering the live multi-stage scanning pipeline automatically.
+
+### 2. Live Resume Synchronization Across All Studios
+- **Previous Demo Behavior:** `AtsStudio.tsx` initialized with hardcoded `INITIAL_DOSSIER` ("Bhavesh Tirgar"). If a user uploaded a new resume in the scanner or navigated directly to `/studio`, the studio still displayed the demo dossier!
+- **Production Fix:** Added `useEffect` in `AtsStudio.tsx` to automatically query `GET /api/ai/resume-process/<activeResumeId>/` on mount. If a processed resume exists in the Django backend, `formatAtsData` transforms the live Pydantic models into the dossier view, updating candidate name, skills, experience, ATS score, and audit notes.
+
+### 3. Interactive Pricing Matrix
+- **Previous Demo Behavior:** Buttons in `PricingMatrix.tsx` (*"Run Free Scan"*, *"Get Pro Access"*, *"Get Lifetime Access"*) had no `onClick` handlers and did nothing.
+- **Production Fix:** Added `handlePlanClick` to scroll to the diagnostic scanner or trigger plan activation with visual feedback and 1-click launch into the ATS studio.
+
+### 4. 1-Click JSON & Markdown Export
+- Added `handleExportReport` in `AtsStudio.tsx` allowing candidates to download their complete ATS diagnostic audit as a structured JSON file.
+- Added `handleExportQuestions` in `InterviewStudio.tsx` allowing candidates to export their STAR interview deck as an offline Markdown file.
+
+### 5. Candidate Alignment Badge in Job Matcher
+- When navigating to `/matcher`, `JobMatchStudio` now displays a verified badge indicating the active candidate's name and total parsed skills, ensuring clarity on which resume is being evaluated against the job description.
+

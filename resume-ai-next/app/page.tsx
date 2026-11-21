@@ -22,6 +22,7 @@ export default function Home() {
   const [activeResumeId, setActiveResumeId] = useState<number>(1);
   const [activeJobMatchId, setActiveJobMatchId] = useState<number>(1);
   const [prefilledJob, setPrefilledJob] = useState<{ title: string; description: string } | null>(null);
+  const [initialScanFile, setInitialScanFile] = useState<File | null>(null);
 
   useEffect(() => {
     const savedId = getActiveResumeId();
@@ -91,6 +92,10 @@ export default function Home() {
               <HeroSection
                 onScanClick={scrollToScanner}
                 onOpenStudio={() => handleTabChange("studio")}
+                onFileSelected={(file) => {
+                  setInitialScanFile(file);
+                  scrollToScanner();
+                }}
               />
 
               {/* Social Proof & Hiring Marquee */}
@@ -103,10 +108,18 @@ export default function Home() {
               <BeforeAfterShowcase />
 
               {/* Real-time Interactive ATS Scanner */}
-              <AtsScannerSection onOpenStudio={() => handleTabChange("studio")} />
+              <AtsScannerSection 
+                onOpenStudio={() => handleTabChange("studio")} 
+                onResumeScanned={handleResumeUploaded}
+                initialFile={initialScanFile}
+              />
 
               {/* Transparent Pricing Matrix */}
-              <PricingMatrix />
+              <PricingMatrix 
+                onScanClick={scrollToScanner}
+                onOpenStudio={() => handleTabChange("studio")}
+                onSelectPlan={() => handleTabChange("studio")}
+              />
 
               {/* FAQ & Executive Footer */}
               <FaqAndFooter />
@@ -122,6 +135,7 @@ export default function Home() {
               transition={{ duration: 0.3 }}
             >
               <AtsStudio
+                activeResumeId={activeResumeId}
                 onNavigateToMatch={() => handleTabChange("matcher")}
                 onNavigateToInterview={() => handleTabChange("interview")}
                 onResumeUploaded={handleResumeUploaded}

@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   HelpCircle, CheckCircle2, ChevronDown, ChevronUp, 
-  Copy, Check, AlertTriangle, Layers, ShieldCheck, Database, RefreshCw, Server
+  Copy, Check, AlertTriangle, Layers, ShieldCheck, Database, RefreshCw, Server, Download
 } from "lucide-react";
 import { INTERVIEW_QUESTIONS } from "@/lib/demoData";
-import { createInterviewPlanApi, getActiveResumeId } from "@/lib/api";
+import { createInterviewPlanApi, getInterviewPlanApi, getActiveResumeId } from "@/lib/api";
 
 interface InterviewStudioProps {
   activeResumeId?: number;
@@ -28,6 +28,51 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId }: InterviewS
     { id: "Security & Prompt Injection", label: "Security & Injection Defense" },
     { id: "Backend & Database Architecture", label: "Django & Database" },
   ];
+
+  // Auto-sync plan on mount if available
+  useEffect(() => {
+    const targetResumeId = activeResumeId || getActiveResumeId();
+    const targetMatchId = activeJobMatchId || 1;
+    getInterviewPlanApi(targetResumeId, targetMatchId)
+      .then((res) => {
+        const rounds = res.plan_data?.rounds || [];
+        const loaded: any[] = [];
+        let qId = 10;
+        rounds.forEach((rnd: any) => {
+          (rnd.questions || []).forEach((q: any) => {
+            loaded.push({
+              id: qId++,
+              category: q.category || "System Architecture",
+              title: q.question.slice(0, 50) + "...",
+              question: q.question,
+              situation: "Calibrated challenge requiring structured STAR execution.",
+              task: q.reason || "Architect resilient systems and deliver measurable outcomes.",
+              action: "Engineered scalable solutions with typed schemas, comprehensive testing, and defensive boundaries.",
+              result: "Delivered 99.9% uptime, verified schema integrity, and improved execution velocity.",
+              trap: "Rookie Trap: Giving generic answers without verifiable metrics or architectural rationale."
+            });
+          });
+        });
+        if (loaded.length > 0) {
+          setQuestions([...loaded, ...INTERVIEW_QUESTIONS]);
+          setApiNotice(`Live Interview Deck Loaded: Active plan synced from Django Backend.`);
+        }
+      })
+      .catch(() => {});
+  }, [activeResumeId, activeJobMatchId]);
+
+  const handleExportQuestions = () => {
+    const textData = questions.map((q, idx) => 
+      `### Question ${idx + 1} (${q.category})\n**${q.question}**\n\n- **Situation:** ${q.situation}\n- **Task:** ${q.task}\n- **Action:** ${q.action}\n- **Result:** ${q.result}\n- **Trap to Avoid:** ${q.trap}\n`
+    ).join("\n---\n\n");
+    const blob = new Blob([textData], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Interview_Preparation_Deck.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleGenerateLivePlan = async () => {
     setIsGenerating(true);
@@ -118,6 +163,15 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId }: InterviewS
           >
             {isGenerating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             <span>Sync with Backend</span>
+          </button>
+
+          <button
+            onClick={handleExportQuestions}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-[#272d3b] bg-white dark:bg-[#111318] text-slate-800 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-[#191d27] transition cursor-pointer"
+            title="Download questions as Markdown"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="hidden sm:inline">Export Deck</span>
           </button>
 
           <div className="flex items-center gap-2 text-xs font-mono bg-white dark:bg-[#111318] border border-slate-200 dark:border-[#20242e] px-3 py-1.5 rounded-lg shadow-xs">

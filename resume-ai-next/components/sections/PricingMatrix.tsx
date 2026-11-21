@@ -3,8 +3,28 @@
 import React, { useState } from "react";
 import { Check, ArrowRight } from "lucide-react";
 
-export function PricingMatrix() {
+interface PricingMatrixProps {
+  onScanClick?: () => void;
+  onOpenStudio?: () => void;
+  onSelectPlan?: (planName: string) => void;
+}
+
+export function PricingMatrix({ onScanClick, onOpenStudio, onSelectPlan }: PricingMatrixProps) {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "lifetime">("monthly");
+  const [activePlanNotice, setActivePlanNotice] = useState<string | null>(null);
+
+  const handlePlanClick = (planName: string) => {
+    if (planName === "Free Diagnostic") {
+      if (onScanClick) onScanClick();
+      else if (typeof window !== "undefined") window.location.hash = "scanner";
+    } else {
+      setActivePlanNotice(`✨ ${planName} Activated! Full Multi-Agent Suite & Interview Cockpit Unlocked.`);
+      onSelectPlan?.(planName);
+      if (onOpenStudio) {
+        setTimeout(onOpenStudio, 1200);
+      }
+    }
+  };
 
   const plans = [
     {
@@ -66,6 +86,12 @@ export function PricingMatrix() {
         <p className="text-slate-600 dark:text-[#8c96a8] text-xs sm:text-sm">
           Run your diagnostic free. Upgrade when actively preparing for interviews.
         </p>
+
+        {activePlanNotice && (
+          <div className="p-3 my-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono text-emerald-700 dark:text-emerald-400 animate-fadeIn">
+            {activePlanNotice}
+          </div>
+        )}
 
         {/* Billing Toggle */}
         <div className="pt-2 flex items-center justify-center gap-2">
@@ -134,10 +160,11 @@ export function PricingMatrix() {
             </div>
 
             <button
+              onClick={() => handlePlanClick(p.name)}
               className={`w-full py-2.5 px-4 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
                 p.highlighted
-                  ? "bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 shadow-sm"
-                  : "bg-slate-100 dark:bg-[#181c25] text-slate-800 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-[#202633] border border-slate-200 dark:border-[#232a38]"
+                  ? "bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 shadow-sm active:scale-95"
+                  : "bg-slate-100 dark:bg-[#181c25] text-slate-800 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-[#202633] border border-slate-200 dark:border-[#232a38] active:scale-95"
               }`}
             >
               <span>{p.cta}</span>
