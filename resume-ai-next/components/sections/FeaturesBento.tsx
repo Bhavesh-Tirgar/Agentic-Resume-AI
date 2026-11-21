@@ -42,18 +42,18 @@ I would welcome the opportunity to bring this strategic focus to your organizati
   const templates = [
     {
       id: "tech",
-      name: "Tech Monospace",
-      desc: "Clean single-column linear layout preferred by engineering screeners at Stripe and Google.",
+      name: "Modern Linear",
+      desc: "Clean single-column layout preferred by enterprise screeners at Fortune 500 companies.",
     },
     {
       id: "harvard",
       name: "Harvard Classic",
-      desc: "Formal serif typographic hierarchy for enterprise leadership roles.",
+      desc: "Formal serif typographic hierarchy for corporate leadership roles.",
     },
     {
       id: "executive",
-      name: "Executive Minimalist",
-      desc: "High information density focused strictly on quantifiable architecture ROI.",
+      name: "Executive High-Impact",
+      desc: "High information density focused strictly on quantifiable business outcomes and revenue scale.",
     },
   ];
 
@@ -69,7 +69,7 @@ I would welcome the opportunity to bring this strategic focus to your organizati
           Precision Engine
         </span>
         <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Built for technical scrutiny.
+          Calibrated for enterprise hiring standards.
         </h2>
         <p className="text-slate-600 dark:text-[#8c96a8] text-xs sm:text-sm leading-relaxed">
           Screening parsers reward clear single-column structure and quantified metrics.
@@ -133,7 +133,7 @@ I would welcome the opportunity to bring this strategic focus to your organizati
                   </div>
                 </div>
                 <p className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-2">
-                  Top 3% Technical Percentile
+                  Top 3% Competitive Percentile
                 </p>
               </div>
 
@@ -206,7 +206,7 @@ I would welcome the opportunity to bring this strategic focus to your organizati
                       Passive & Unquantified
                     </span>
                     <p className="text-xs text-slate-500 dark:text-zinc-400 line-through leading-relaxed">
-                      "Responsible for working on microservices and writing automated unit tests."
+                      "Responsible for managing daily team deliverables and client project updates."
                     </p>
                   </motion.div>
                 ) : (
@@ -221,7 +221,7 @@ I would welcome the opportunity to bring this strategic focus to your organizati
                       Recruiter-Approved (+44% Impact)
                     </span>
                     <p className="text-xs text-slate-900 dark:text-zinc-100 font-medium leading-relaxed">
-                      "Architected event bus in Kafka & Go; cut p99 ingestion latency by 44% under 1.2M req/sec."
+                      "Directed cross-functional execution across 18 enterprise deliverables, cutting turnaround by 42% while sustaining 99.4% SLA adherence."
                     </p>
                   </motion.div>
                 )}

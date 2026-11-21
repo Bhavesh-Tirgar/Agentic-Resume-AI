@@ -18,7 +18,7 @@ export function PricingMatrix({ onScanClick, onOpenStudio, onSelectPlan }: Prici
       if (onScanClick) onScanClick();
       else if (typeof window !== "undefined") window.location.hash = "scanner";
     } else {
-      setActivePlanNotice(`✨ ${planName} Activated! Full Multi-Agent Suite & Interview Cockpit Unlocked.`);
+      setActivePlanNotice(`✨ Free Beta Preview Active: ${planName} unlocked without payment. Launching Studio...`);
       onSelectPlan?.(planName);
       if (onOpenStudio) {
         setTimeout(onOpenStudio, 1200);
@@ -42,31 +42,31 @@ export function PricingMatrix({ onScanClick, onOpenStudio, onSelectPlan }: Prici
       highlighted: false,
     },
     {
-      name: "Pro Engineer",
+      name: "Career Pro",
       price: billingCycle === "monthly" ? "$19" : "$89",
       cadence: billingCycle === "monthly" ? "/month" : "one-time",
-      description: "Full multi-agent suite for active interview cycles.",
+      description: "Full AI career intelligence suite for active job search cycles.",
       features: [
-        "Unlimited resume scans",
+        "Unlimited resume scans & revisions",
         "1-Click quantifiable bullet rewriter",
-        "Job description gap analysis",
-        "STAR interview question cockpit",
-        "Harvard & Tech ATS templates",
+        "Job description match & gap audit",
+        "STAR interview question preparation",
+        "Harvard & Modern Executive ATS formats",
       ],
       cta: "Get Pro Access",
       highlighted: true,
       badge: "Recommended",
     },
     {
-      name: "Executive Lifetime",
+      name: "Executive Suite",
       price: "$149",
       cadence: "one-time",
-      description: "Lifetime access for staff engineers and engineering leaders.",
+      description: "Lifetime career intelligence for leaders and professionals.",
       features: [
-        "All Pro capabilities forever",
+        "All Career Pro capabilities forever",
         "Executive cover letter generator",
-        "Priority Gemini model routing",
-        "Lifetime platform updates",
+        "Instant high-priority AI processing",
+        "Lifetime platform updates & exports",
       ],
       cta: "Get Lifetime Access",
       highlighted: false,

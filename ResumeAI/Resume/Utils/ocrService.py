@@ -1,4 +1,6 @@
 import io
+import os
+import shutil
 import fitz
 
 class OCRService:
@@ -17,11 +19,15 @@ class OCRService:
             print(f"OCR dependencies not available: {e}")
             return ""
 
-        # Set default Tesseract binary path if installed
-        try:
-            pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-        except Exception:
-            pass
+        # Dynamically locate Tesseract executable across environments
+        custom_cmd = os.getenv("TESSERACT_CMD")
+        if custom_cmd and os.path.exists(custom_cmd):
+            pytesseract.pytesseract.tesseract_cmd = custom_cmd
+        elif not shutil.which("tesseract"):
+            # Check standard Windows path if on Windows and not in PATH
+            win_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+            if os.name == "nt" and os.path.exists(win_path):
+                pytesseract.pytesseract.tesseract_cmd = win_path
 
         document = fitz.open(pdf_path)
         extracted_text = []

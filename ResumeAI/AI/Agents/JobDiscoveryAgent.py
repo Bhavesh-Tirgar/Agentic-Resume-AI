@@ -41,17 +41,27 @@ class JobDiscoveryAgent:
     def run(
         self,
         resume: ResumeSchema,
-        location: str = "Ahmedabad, India",
+        location: str = "Remote / Nearby",
         work_type: str = "All"
     ) -> JobDiscoveryResponseSchema:
         if resume is None:
             raise ValueError("Resume cannot be None.")
 
+        # If location is generic, attempt to infer from recent experience or education
+        target_location = location
+        if target_location in ("Remote / Nearby", "All", "", None):
+            for exp in (resume.experience or []):
+                if exp.location and exp.location.strip():
+                    target_location = exp.location.strip()
+                    break
+            if target_location in ("Remote / Nearby", "All", "", None):
+                target_location = "Remote / Global"
+
         token_counter = TokenCounter(agent_name="JobDiscoveryAgent")
         try:
             result = self.chain.invoke(
                 {
-                    "location": location,
+                    "location": target_location,
                     "work_type": work_type,
                     "resume": resume.model_dump_json(indent=2),
                 }

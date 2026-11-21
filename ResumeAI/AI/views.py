@@ -35,25 +35,28 @@ def get_user_resume_or_default(user, resume_id: int) -> Resume:
         return resume
 
     # Fallback: create baseline resume for seamless first-time onboarding
-    baseline_text = """BHAVESH TIRGAR
-Email: bhavesh@example.com | Phone: +91 98765 43210 | Ahmedabad, Gujarat, India
-Senior AI Systems & Backend Engineer
+    baseline_text = """ALEX MORGAN
+Email: alex.morgan@example.com | Phone: +1 (555) 019-2834 | San Francisco, CA
+Senior Solutions & Systems Specialist
+
+SUMMARY:
+Results-driven solutions specialist with 6+ years driving cross-functional technology initiatives, optimizing workflows, and enhancing client satisfaction across enterprise organizations.
 
 EXPERIENCE:
-Senior AI Systems Engineer - Autonomous Labs (2024 - Present)
-- Architected multi-agent backend pipelines using LangGraph and Gemini models with Pydantic validation.
-- Engineered 14+ RESTful endpoints in Django REST Framework sustaining <45ms p99 latency under load.
-- Hardened backend against prompt injections with XML quarantine boundaries and binary magic-byte verification.
+Senior Solutions Specialist - Apex Global Solutions (2023 - Present)
+- Spearheaded cross-functional delivery across 18 enterprise client accounts, boosting annual contract retention by 28%.
+- Optimized operational workflows, decreasing average project turnaround from 14 days to 4.2 days.
+- Authored standard operating procedures adopted by 45+ team members, achieving 99.4% SLA adherence.
 
-Backend & Systems Developer - CloudScale Technologies (2022 - 2024)
-- Engineered high-throughput asynchronous job workers with Celery and Redis, reducing latency by 45%.
-- Implemented stateless JWT auth flow with refresh rotation and sliding session expiration.
+Operations Analyst - Meridian Enterprise Partners (2020 - 2023)
+- Conducted quarterly compliance and business performance audits covering $12M in client portfolios with zero discrepancy.
+- Automated data reporting routines, reducing manual spreadsheet tracking by 16 hours per week.
 
 EDUCATION:
-B.Tech in Computer Engineering - Gujarat Technological University (2022)
+B.S. in Business Administration & Information Systems - State University (2020)
 
 SKILLS:
-Python, Django, Django REST Framework, LangGraph, FastAPI, React, Next.js, PostgreSQL, Redis, Docker, Git, Linux
+Strategic Planning, Project Delivery, Enterprise Operations, Process Optimization, Client Management, Data Analysis, SQL, Jira, Agile Leadership
 """
     resume = Resume.objects.create(
         user=user,
