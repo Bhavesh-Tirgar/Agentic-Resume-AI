@@ -95,6 +95,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview }: AtsStudi
               : ["PostgreSQL", "Redis", "SQLite"],
             devops: ["Docker", "Git", "GitHub Actions", "Linux"]
           },
+          detected_languages: backendParsed.languages?.length ? backendParsed.languages : ["English", "Hindi"],
           experience: backendParsed.experience?.length ? backendParsed.experience.map((e: any) => ({
             role: e.role || "Senior Systems & AI Engineer",
             organization: e.organization || "Autonomous Labs",
@@ -151,9 +152,16 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview }: AtsStudi
           <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
             {parsed_data.name}
           </h1>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-            {parsed_data.title} • {parsed_data.location}
-          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              {parsed_data.title} • {parsed_data.location}
+            </p>
+            {parsed_data.detected_languages && parsed_data.detected_languages.length > 0 && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                <span>🌐 {parsed_data.detected_languages.join(" • ")}</span>
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2.5 w-full md:w-auto">

@@ -24,6 +24,7 @@ export interface CandidateDossier {
     databases: string[];
     devops: string[];
   };
+  detected_languages?: string[];
   experience: {
     role: string;
     organization: string;
@@ -119,6 +120,7 @@ export const INITIAL_DOSSIER: AtsResultData = {
       databases: ["PostgreSQL", "Redis", "SQLite", "Vector Stores (Chroma)"],
       devops: ["Docker", "Git", "GitHub Actions", "Linux / Bash", "Nginx"]
     },
+    detected_languages: ["English", "Hindi", "Global Script Supported"],
     experience: [
       {
         role: "Senior AI Systems Engineer",

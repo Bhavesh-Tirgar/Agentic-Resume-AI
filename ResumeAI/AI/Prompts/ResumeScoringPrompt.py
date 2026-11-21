@@ -93,10 +93,12 @@ Return ONLY structured data matching the provided schema.
 
 Every score must be an integer between 0 and 100.
 
-Do not invent information that does not exist in the
-resume.
+Do not invent information that does not exist in the resume.
 
 Use the resume analysis as supporting context.
+
+Multilingual Fair Evaluation:
+Multilingual resumes (in French, Hindi, Chinese, Spanish, German, etc.) must be evaluated on their true technical merits. When candidate technical competencies are present in foreign languages or non-Latin scripts, map them to standard industry equivalents and do not arbitrarily dock ATS or Keyword scores simply for being non-English.
 
 STRUCTURED RESUME
 

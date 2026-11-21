@@ -17,6 +17,9 @@ If no information is available for a field, return an empty array.
 Base your analysis ONLY on the information present in the resume.
 Do NOT invent skills, experience, projects, certifications, or achievements.
 
+Multilingual Support:
+If the resume is written in Hindi, French, Chinese, German, Spanish, or any other language, evaluate the technical accomplishments and experience accurately. Provide the analytical feedback, strengths, and improvement suggestions in English so global technical recruiters and engineering leaders can readily evaluate the candidate.
+
 Evaluation Criteria:
 
 Strengths:

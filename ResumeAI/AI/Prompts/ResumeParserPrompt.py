@@ -13,12 +13,17 @@ Extraction Instructions:
 - Do NOT include explanations.
 - Preserve original information. Do not invent or hallucinate facts.
 - If a string value is unavailable, use "". If a list is unavailable, use [].
+- MULTILINGUAL & CROSS-LINGUAL SUPPORT:
+  * Natively support resumes written in ANY language, script, or dialect (e.g., English, Hindi / Devanagari, French, Spanish, German, Mandarin Chinese, Japanese, Arabic, Russian, etc.).
+  * Detect the candidate's languages (both resume language and listed proficiencies) and populate the "languages" array (e.g., ["English", "Hindi", "French"]).
+  * For the "skills" field, extract the skills and also include standard industry English equivalents (e.g., 'पायथन' -> 'Python', '机器学习' -> 'Machine Learning', 'Développement Web' -> 'Web Development') to guarantee 100% Applicant Tracking System (ATS) indexability across enterprise systems.
 
 JSON Schema:
 {{
   "name": "",
   "email": "",
   "phone": "",
+  "summary": "",
   "education": [
     {{
       "degree": "",
@@ -43,6 +48,7 @@ JSON Schema:
     }}
   ],
   "skills": [],
+  "languages": [],
   "certifications": [
     {{
       "name": "",
