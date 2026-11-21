@@ -66,25 +66,25 @@ export const INITIAL_DOSSIER: AtsResultData = {
   score_data: {
     overall_score: 89,
     grade: "Tier-1 Competitive",
-    percentile: "Top 6% of Systems Engineers",
-    summary: "High-density technical profile with proven depth in distributed backend systems and agentic workflows. ATS readability is near-optimal. 2 bullets can be sharpened with absolute throughput metrics.",
+    percentile: "Top 6% of Competitive Candidates",
+    summary: "High-density professional profile with verified single-column ATS compatibility. Technical and operational competencies are well-distributed across verified industry rubrics.",
     categories: [
       { name: "ATS Machine Readability", score: 96, status: "Optimal", feedback: "Single-column flow, standard headings, parseable contact metadata." },
-      { name: "Quantifiable Metric Density", score: 86, status: "Good", feedback: "Contains strong percentage gains; add absolute RPS or latency numbers." },
-      { name: "Core Technology Depth", score: 92, status: "Exceptional", feedback: "Demonstrated production use of Python, LangGraph, Django, and PostgreSQL." },
-      { name: "Architectural Ownership", score: 84, status: "Exceptional", feedback: "Demonstrates clear ownership of security hardening and scaling." }
+      { name: "Quantifiable Metric Density", score: 86, status: "Good", feedback: "Contains strong percentage gains; add absolute throughput or revenue metrics." },
+      { name: "Core Domain Competencies", score: 92, status: "Exceptional", feedback: "Demonstrated production use of core technologies and methodology stack." },
+      { name: "Role Ownership & Impact", score: 84, status: "Exceptional", feedback: "Demonstrates clear ownership of strategic initiatives and execution." }
     ]
   },
   analysis_data: {
     strengths: [
-      "Engineered multi-agent pipeline using LangGraph and Gemini models with Pydantic validation.",
-      "Hardened backend with stateless JWT, DRF rate limits, and PDF magic-byte validation.",
+      "Engineered resilient workflows with verified throughput gains and measurable performance.",
+      "Hardened backend pipelines with stateless authentication, rate limits, and binary data verification.",
       "Measurable performance outcomes: achieved 45% faster ingestion and 60% latency reduction.",
       "Clear architectural separation between state management, storage, and worker processes."
     ],
     weaknesses: [
-      "DevOps: Kubernetes and Terraform are absent from current production experience bullets.",
-      "Test Coverage: Explicit test coverage percentages (e.g. 94% pytest coverage) are missing."
+      "Explicit test coverage percentages or operational governance metrics can be sharpened.",
+      "Highlight additional cross-functional collaboration and leadership accomplishments."
     ],
     bullet_rewrites: [
       {
@@ -98,23 +98,23 @@ export const INITIAL_DOSSIER: AtsResultData = {
         reason: "Replaces vague 'worked on' with precise node count, model version, validation layer, and measurable accuracy."
       },
       {
-        original: "Fixed security and upload bugs on the platform.",
-        rewritten: "Eliminated prompt injection attack vectors via XML quarantine boundaries and added binary magic-byte verification for file ingestion.",
-        reason: "Transforms generic maintenance claim into concrete security engineering achievements."
+        original: "Managed business development pipelines and client presentations.",
+        rewritten: "Led enterprise customer acquisition generating ₹3.4 Cr net new revenue across 28 corporate accounts, attaining 142% quota achievement.",
+        reason: "Adds verifiable revenue metrics, account volume, and quota attainment percentages."
       }
     ],
     improvements: [
-      "Add explicit test metrics into your latest role: specify pytest, integration testing, and mock patterns.",
-      "Quantify your microservices architecture with concurrency numbers (RPS, queue depth, or thread pools)."
+      "Quantify each past role with exact throughput, revenue, or team efficiency benchmarks.",
+      "Ensure all listed certifications and methodologies are reflected directly in the experience bullets."
     ]
   },
   parsed_data: {
-    name: "Bhavesh Tirgar",
-    title: "Senior Full Stack & AI Systems Engineer",
+    name: "Sample Verified Dossier",
+    title: "Senior Systems & Solutions Specialist",
     location: "Ahmedabad, India",
-    email: "bhavesh@example.com",
-    linkedin: "linkedin.com/in/bhavesh-tirgar",
-    github: "github.com/Bhavesh-Tirgar",
+    email: "candidate@resumeai.io",
+    linkedin: "linkedin.com/in/verified-candidate",
+    github: "github.com/verified-candidate",
     skills: {
       languages: ["Python", "TypeScript", "JavaScript", "SQL", "Go"],
       frameworks: ["Django REST Framework", "LangGraph", "FastAPI", "React 19", "Next.js 14"],

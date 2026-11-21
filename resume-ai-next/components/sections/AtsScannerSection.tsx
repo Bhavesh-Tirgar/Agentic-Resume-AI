@@ -34,10 +34,10 @@ export function AtsScannerSection({ onOpenStudio, onResumeScanned, initialFile }
   }, [initialFile]);
 
   const steps = [
-    { title: "Binary Validation", desc: "Verifying %PDF magic bytes on Django" },
-    { title: "Entity Extraction", desc: "Structuring skills and experience via LangGraph" },
-    { title: "Screener Benchmark", desc: "Testing Workday and Lever heuristics" },
-    { title: "Bullet Optimization", desc: "Evaluating quantifiable impact metrics" },
+    { title: "Document Verification", desc: "Verifying formatting integrity and metadata encoding" },
+    { title: "Entity Extraction", desc: "Structuring skills, education, and career milestones" },
+    { title: "Screener Benchmark", desc: "Auditing against Workday, Greenhouse & Lever heuristics" },
+    { title: "Bullet Optimization", desc: "Evaluating quantifiable impact and achievement metrics" },
   ];
 
   const handleStartScan = async (file?: File) => {
@@ -96,7 +96,7 @@ export function AtsScannerSection({ onOpenStudio, onResumeScanned, initialFile }
       <div className="text-center mb-8 space-y-2">
         <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#111318] border border-slate-200 dark:border-[#20242e] text-[11px] font-mono text-slate-500 dark:text-zinc-400">
           <Server className="w-3 h-3 text-emerald-500" />
-          <span>Django REST Framework + LangGraph</span>
+          <span>Enterprise ATS Diagnostic Engine</span>
         </div>
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
           Live ATS Resume Scanner
@@ -142,7 +142,7 @@ export function AtsScannerSection({ onOpenStudio, onResumeScanned, initialFile }
             Click to upload or drag and drop resume PDF
           </h3>
           <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">
-            Max 5MB • Validated with binary %PDF- verification on backend
+            Max 5MB • Supported format: PDF • 100% Private Analysis
           </p>
           <button
             type="button"

@@ -26,7 +26,7 @@ export function BeforeAfterShowcase() {
           The difference one bullet makes.
         </h2>
         <p className="text-slate-600 dark:text-[#8c96a8] text-xs sm:text-sm leading-relaxed">
-          Screeners filter out passive duties. They look for scale, latency, and concrete outcomes.
+          Screeners filter out passive task lists. They reward quantifiable scale, revenue growth, and concrete business outcomes across every role.
         </p>
       </div>
 

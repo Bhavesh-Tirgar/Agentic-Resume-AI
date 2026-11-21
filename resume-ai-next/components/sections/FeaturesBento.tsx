@@ -12,11 +12,11 @@ export function FeaturesBento() {
   const [atsScore] = useState(94);
   const [tailorStep, setTailorStep] = useState<"before" | "after">("after");
 
-  const fullLetterText = `Dear Engineering Lead,
+  const fullLetterText = `Dear Hiring Director,
 
-Over the past 5 years, I scaled microservices to 45,000 req/sec with <35ms p99 latency in Python and Go, while orchestrating multi-agent LLM systems with LangGraph.
+Over the past 5 years, I scaled high-impact cross-functional initiatives delivering 45% faster execution, ₹3.2 Cr in operational revenue optimization, and verified SLA performance.
 
-I would love to bring this systems focus to your Core Infrastructure team.`;
+I would welcome the opportunity to bring this strategic focus to your organization.`;
 
   const [displayedText, setDisplayedText] = useState("");
   const [typingIndex, setTypingIndex] = useState(0);
