@@ -305,3 +305,39 @@ In Western enterprise hiring, Applicant Tracking Systems (e.g., Workday, Taleo, 
 ### 4. Quota & Rate-Limit Resilience
 - Google AI Studio Free Tier enforces a strict rate limit of **20 requests/day** for `gemini-2.5-flash`.
 - Our backend architecture isolates this with a deterministic Pydantic heuristic fallback engine: when quota is reached or network connectivity drops, the service returns valid structured data with `200 OK`, preventing user-facing 500 errors.
+
+---
+
+## 12. Autonomous Job Scout Agent & Full-Stack Zero-404 Resilience
+
+### 1. Root Cause Analysis of Previous Bugs
+1. **Hardcoded Resume & Match IDs:**
+   - `JobMatchStudio` hardcoded `resumeId = 1` and `InterviewStudio` hardcoded `(1, 1)`.
+   - When a guest or authenticated user uploaded their own resume (e.g. ID #2 or #5), querying ID #1 failed with `404 Not Found` because ID #1 belonged to another user.
+2. **First-Time Guest Onboarding:**
+   - New visitors accessing Job Matcher, Job Scout, or Interview Cockpit before uploading a PDF experienced 404 errors.
+   - **Resolution:** Implemented `get_user_resume_or_default` in `AI/views.py`: if the requested ID does not belong to the user, the backend gracefully falls back to their latest resume; if they have zero resumes, it automatically instantiates a baseline technical profile, guaranteeing zero 404s.
+
+### 2. New Autonomous Job Scout Agent (`JobDiscoveryAgent`)
+We engineered a dedicated **Job Scout Agent** that takes the candidate's parsed technical resume and discovers opportunities geographically near their location (or remote):
+- **Schema (`AI/Schemas/JobDiscoverySchema.py`):**
+  - Defines `DiscoveredJob` with title, company, regional tech corridor location, work type (`Remote`, `Hybrid`, `On-site`), distance/commute estimate, match percentage (0-100), salary bracket, matched vs. missing skills, and strategic rationale.
+- **Agent (`AI/Agents/JobDiscoveryAgent.py`):**
+  - Uses `GeminiService.get_structured_llm(JobDiscoveryResponseSchema)` with `JobDiscoveryPrompt`.
+- **Database Model (`AI/Models/JobDiscoveryResult.py`):**
+  - Persists query location, work arrangement filter, and structured discovery payload per candidate resume.
+- **Service & Resilient Fallback (`AI/Services/JobDiscoveryService.py`):**
+  - Evaluates proximity to major IT corridors (e.g., SG Highway / Bodakdev in Ahmedabad; Outer Ring Road / Koramangala in Bengaluru; Senapati Bapat Road in Pune; London; Remote).
+  - Built-in heuristic engine guarantees `200 OK` responses even under upstream Gemini free-tier rate limits.
+- **REST API Endpoints:**
+  - `GET /api/ai/resume/<id>/job-finder/` (Retrieve active opportunities)
+  - `POST /api/ai/resume/<id>/job-finder/` (Query with custom `location` and `work_type`)
+
+### 3. Frontend Job Scout Studio (`JobScoutStudio.tsx`)
+- Added **Job Scout** tab to top navbar island with a live pulse indicator.
+- **Proximity & Commute Search:** City search input with work arrangement filters (`All`, `Remote Only`, `Hybrid`, `On-site`) and Minimum Match slider.
+- **Opportunity Cards:** Displays hiring company, commute distance (`📍 6 km from city center`), compensation bracket (`₹22L — ₹34L / yr`), matched vs. upskilling tags, and agent insight.
+- **1-Click Studio Bridges:**
+  - `Run Match`: Loads the selected job directly into `JobMatchStudio` to compute skill alignment.
+  - `Prep Interview`: Bridges directly into `InterviewStudio` with targeted STAR questions.
+  - `Live Listings`: Direct link to Google Jobs / LinkedIn search for immediate application.

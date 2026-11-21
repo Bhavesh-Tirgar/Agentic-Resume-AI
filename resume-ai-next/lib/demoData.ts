@@ -251,3 +251,100 @@ export const INTERVIEW_QUESTIONS = [
     trap: "Rookie Trap: Hardcoding database drivers or omitting rate limits on expensive LLM-backed endpoints."
   }
 ];
+
+
+export interface DiscoveredJobItem {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  work_type: string;
+  distance_commute: string;
+  match_percentage: number;
+  salary_range: string;
+  experience_required: string;
+  matched_skills: string[];
+  missing_skills: string[];
+  description_snippet: string;
+  apply_url: string;
+  match_rationale: string;
+}
+
+export interface JobDiscoveryData {
+  candidate_location: string;
+  total_jobs_found: number;
+  jobs: DiscoveredJobItem[];
+  search_summary: string;
+}
+
+export const DEMO_DISCOVERED_JOBS: JobDiscoveryData = {
+  candidate_location: "Ahmedabad, Gujarat, India",
+  total_jobs_found: 4,
+  search_summary: "Found 4 proximity and tech-stack matched opportunities near Ahmedabad with >85% technical compatibility.",
+  jobs: [
+    {
+      id: "job-1",
+      title: "Senior AI Systems & Backend Architect",
+      company: "Crest Data Systems",
+      location: "Ahmedabad, India (Bodakdev, SG Highway)",
+      work_type: "Hybrid",
+      distance_commute: "6 km from city center",
+      match_percentage: 95,
+      salary_range: "₹22L — ₹34L / yr",
+      experience_required: "4+ years",
+      matched_skills: ["Python", "Django REST Framework", "LangGraph", "PostgreSQL", "Docker"],
+      missing_skills: ["Apache Kafka", "Terraform Cloud IaC"],
+      description_snippet: "Lead high-throughput backend services and multi-agent AI orchestration pipelines. Build fault-tolerant microservices.",
+      apply_url: "https://www.google.com/search?q=Senior+AI+Systems+Backend+Architect+Crest+Data+Systems+Ahmedabad+jobs",
+      match_rationale: "Direct alignment with your multi-agent LangGraph architecture, DRF backend security, and PostgreSQL query optimizations."
+    },
+    {
+      id: "job-2",
+      title: "Lead Python & Autonomous Agent Engineer",
+      company: "TatvaSoft Global Solutions",
+      location: "Ahmedabad, India (Thaltej, SG Highway)",
+      work_type: "Remote / Hybrid",
+      distance_commute: "8 km from city center",
+      match_percentage: 92,
+      salary_range: "₹25L — ₹38L / yr",
+      experience_required: "3-6 years",
+      matched_skills: ["Python", "FastAPI", "Django", "Redis", "Linux", "Git"],
+      missing_skills: ["Milvus Vector Store", "eBPF Tracing"],
+      description_snippet: "Architect autonomous agent reasoning loops, integrate stateful memory stores, and develop low-latency REST endpoints.",
+      apply_url: "https://www.google.com/search?q=Lead+Python+Autonomous+Agent+Engineer+TatvaSoft+Ahmedabad+jobs",
+      match_rationale: "Directly rewards your production experience with Pydantic v2 schemas and deterministic cyclical graph states."
+    },
+    {
+      id: "job-3",
+      title: "Full Stack AI Platform Engineer (Python / Next.js)",
+      company: "Simform Engineering Labs",
+      location: "Ahmedabad, India (Science City Road)",
+      work_type: "Hybrid",
+      distance_commute: "11 km from city center",
+      match_percentage: 89,
+      salary_range: "₹18L — ₹28L / yr",
+      experience_required: "3+ years",
+      matched_skills: ["Python", "Django", "React", "TypeScript", "Next.js 14", "PostgreSQL"],
+      missing_skills: ["GraphQL Federation", "Cypress E2E"],
+      description_snippet: "Build full stack interfaces and generative UI studios connected to Python microservices and distributed databases.",
+      apply_url: "https://www.google.com/search?q=Full+Stack+Platform+Engineer+Simform+Ahmedabad+jobs",
+      match_rationale: "Bridges your backend API depth with modern Next.js 14 App Router and reactive frontend engineering."
+    },
+    {
+      id: "job-4",
+      title: "Distributed Infrastructure & API Specialist",
+      company: "Volansys Technologies",
+      location: "Ahmedabad, India (Prahlad Nagar)",
+      work_type: "On-site / Hybrid",
+      distance_commute: "9 km from city center",
+      match_percentage: 86,
+      salary_range: "₹20L — ₹30L / yr",
+      experience_required: "4+ years",
+      matched_skills: ["Docker", "Linux", "Git", "PostgreSQL", "Python"],
+      missing_skills: ["Kubernetes Operators", "Prometheus / Grafana"],
+      description_snippet: "Design hardened containerized deployments, manage stateless JWT auth flows, and eliminate latency bottlenecks.",
+      apply_url: "https://www.google.com/search?q=Infrastructure+API+Specialist+Volansys+Ahmedabad+jobs",
+      match_rationale: "Leverages your containerization, binary validation, and rate-limiting security engineering accomplishments."
+    }
+  ]
+};

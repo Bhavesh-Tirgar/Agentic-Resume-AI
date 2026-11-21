@@ -5,7 +5,7 @@ import { ArrowRight, Menu, X, Sun, Moon, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTheme } from "../ThemeProvider";
 
-export type NavTab = "overview" | "studio" | "matcher" | "interview";
+export type NavTab = "overview" | "studio" | "matcher" | "scout" | "interview";
 
 interface NavbarProps {
   currentTab: NavTab;
@@ -103,6 +103,17 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
             Job Matcher
           </button>
           <button
+            onClick={() => onTabChange("scout")}
+            className={`px-3 py-1 rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+              currentTab === "scout"
+                ? "bg-white dark:bg-[#191d27] text-slate-900 dark:text-white font-semibold shadow-xs"
+                : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+            }`}
+          >
+            <span>Job Scout</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          </button>
+          <button
             onClick={() => onTabChange("interview")}
             className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
               currentTab === "interview"
@@ -184,6 +195,18 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
             }`}
           >
             Job Description Matcher
+          </button>
+          <button
+            onClick={() => {
+              onTabChange("scout");
+              setMobileMenuOpen(false);
+            }}
+            className={`text-left px-3 py-2 rounded-lg transition flex items-center justify-between ${
+              currentTab === "scout" ? "bg-slate-100 dark:bg-[#191d27] font-semibold" : "text-slate-600 dark:text-zinc-400"
+            }`}
+          >
+            <span>Job Scout (Nearby Jobs)</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </button>
           <button
             onClick={() => {

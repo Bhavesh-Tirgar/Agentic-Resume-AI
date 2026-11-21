@@ -6,9 +6,14 @@ import {
   Copy, Check, AlertTriangle, Layers, ShieldCheck, Database, RefreshCw, Server
 } from "lucide-react";
 import { INTERVIEW_QUESTIONS } from "@/lib/demoData";
-import { createInterviewPlanApi } from "@/lib/api";
+import { createInterviewPlanApi, getActiveResumeId } from "@/lib/api";
 
-export function InterviewStudio() {
+interface InterviewStudioProps {
+  activeResumeId?: number;
+  activeJobMatchId?: number;
+}
+
+export function InterviewStudio({ activeResumeId, activeJobMatchId }: InterviewStudioProps) {
   const [questions, setQuestions] = useState(INTERVIEW_QUESTIONS);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [expandedId, setExpandedId] = useState<number | null>(1);
@@ -28,7 +33,9 @@ export function InterviewStudio() {
     setIsGenerating(true);
     setApiNotice(null);
     try {
-      const res = await createInterviewPlanApi(1, 1);
+      const targetResumeId = activeResumeId || getActiveResumeId();
+      const targetMatchId = activeJobMatchId || 1;
+      const res = await createInterviewPlanApi(targetResumeId, targetMatchId);
       const rounds = res.plan_data?.rounds || [];
       const generatedQuestions: any[] = [];
       let qId = 10;

@@ -13,9 +13,10 @@ import { uploadResumeApi, processResumeApi, checkBackendHealth } from "@/lib/api
 interface AtsStudioProps {
   onNavigateToMatch?: () => void;
   onNavigateToInterview?: () => void;
+  onResumeUploaded?: (resumeId: number) => void;
 }
 
-export function AtsStudio({ onNavigateToMatch, onNavigateToInterview }: AtsStudioProps) {
+export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUploaded }: AtsStudioProps) {
   const [data, setData] = useState<AtsResultData>(INITIAL_DOSSIER);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -47,6 +48,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview }: AtsStudi
     try {
       // 1. Upload to Django REST Framework backend
       const uploadRes = await uploadResumeApi(file);
+      onResumeUploaded?.(uploadRes.resume_id);
       
       // 2. Trigger LangGraph Multi-Agent processing on backend
       const processRes = await processResumeApi(uploadRes.resume_id);

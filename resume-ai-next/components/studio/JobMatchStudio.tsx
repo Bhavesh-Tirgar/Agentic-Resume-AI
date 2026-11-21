@@ -1,24 +1,45 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Target, CheckCircle2, AlertCircle, ArrowRight, 
   Layers, FileText, Check, Sparkles, RefreshCw, HelpCircle, Server
 } from "lucide-react";
 import { JOB_ROLES_PRESETS, DEMO_JOB_MATCH_RESULT } from "@/lib/demoData";
-import { matchJobApi } from "@/lib/api";
+import { matchJobApi, getActiveResumeId } from "@/lib/api";
 
 interface JobMatchStudioProps {
-  onStartInterview?: () => void;
+  activeResumeId?: number;
+  initialJobTitle?: string;
+  initialJobDescription?: string;
+  onStartInterview?: (matchId?: number) => void;
+  onMatchComplete?: (matchId: number) => void;
 }
 
-export function JobMatchStudio({ onStartInterview }: JobMatchStudioProps) {
+export function JobMatchStudio({ 
+  activeResumeId, 
+  initialJobTitle, 
+  initialJobDescription, 
+  onStartInterview,
+  onMatchComplete
+}: JobMatchStudioProps) {
   const [selectedPreset, setSelectedPreset] = useState(JOB_ROLES_PRESETS[0].id);
-  const [jobTitle, setJobTitle] = useState(JOB_ROLES_PRESETS[0].title);
-  const [jobDescription, setJobDescription] = useState(JOB_ROLES_PRESETS[0].description);
+  const [jobTitle, setJobTitle] = useState(initialJobTitle || JOB_ROLES_PRESETS[0].title);
+  const [jobDescription, setJobDescription] = useState(initialJobDescription || JOB_ROLES_PRESETS[0].description);
   const [isMatching, setIsMatching] = useState(false);
   const [matchResult, setMatchResult] = useState(DEMO_JOB_MATCH_RESULT);
   const [apiNotice, setApiNotice] = useState<string | null>(null);
+  const [activeMatchId, setActiveMatchId] = useState<number>(1);
+
+  // Sync if initialJobTitle changes
+  useEffect(() => {
+    if (initialJobTitle) {
+      setJobTitle(initialJobTitle);
+      if (initialJobDescription) {
+        setJobDescription(initialJobDescription);
+      }
+    }
+  }, [initialJobTitle, initialJobDescription]);
 
   const handleSelectPreset = (presetId: string) => {
     setSelectedPreset(presetId);
@@ -34,9 +55,12 @@ export function JobMatchStudio({ onStartInterview }: JobMatchStudioProps) {
     setApiNotice(null);
 
     try {
+      const targetResumeId = activeResumeId || getActiveResumeId();
       // Live Django REST Framework API Call
-      const res = await matchJobApi(1, jobTitle, jobDescription);
+      const res = await matchJobApi(targetResumeId, jobTitle, jobDescription);
       const m = res.match_data || {};
+      setActiveMatchId(res.job_match_id);
+      onMatchComplete?.(res.job_match_id);
 
       setMatchResult({
         overall_match_score: m.overall_match_score || 91,
@@ -82,7 +106,7 @@ export function JobMatchStudio({ onStartInterview }: JobMatchStudioProps) {
 
         {onStartInterview && (
           <button
-            onClick={onStartInterview}
+            onClick={() => onStartInterview(activeMatchId)}
             className="flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition cursor-pointer self-start md:self-auto"
           >
             <HelpCircle className="w-3.5 h-3.5" />

@@ -11,17 +11,26 @@ import { PricingMatrix } from "@/components/sections/PricingMatrix";
 import { FaqAndFooter } from "@/components/sections/FaqAndFooter";
 import { AtsStudio } from "@/components/studio/AtsStudio";
 import { JobMatchStudio } from "@/components/studio/JobMatchStudio";
+import { JobScoutStudio } from "@/components/studio/JobScoutStudio";
 import { InterviewStudio } from "@/components/studio/InterviewStudio";
+import { DiscoveredJobItem } from "@/lib/demoData";
+import { getActiveResumeId, setActiveResumeId as saveActiveResumeId } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Home() {
   const [currentTab, setCurrentTab] = useState<NavTab>("overview");
+  const [activeResumeId, setActiveResumeId] = useState<number>(1);
+  const [activeJobMatchId, setActiveJobMatchId] = useState<number>(1);
+  const [prefilledJob, setPrefilledJob] = useState<{ title: string; description: string } | null>(null);
 
-  // Check URL hash on initial load
   useEffect(() => {
+    const savedId = getActiveResumeId();
+    if (savedId) {
+      setActiveResumeId(savedId);
+    }
     if (typeof window !== "undefined") {
       const hash = window.location.hash.replace("#", "");
-      if (hash === "studio" || hash === "matcher" || hash === "interview") {
+      if (hash === "studio" || hash === "matcher" || hash === "scout" || hash === "interview") {
         setCurrentTab(hash as NavTab);
       }
     }
@@ -30,6 +39,19 @@ export default function Home() {
   const handleTabChange = (tab: NavTab) => {
     setCurrentTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleResumeUploaded = (id: number) => {
+    setActiveResumeId(id);
+    saveActiveResumeId(id);
+  };
+
+  const handleMatchFromScout = (job: DiscoveredJobItem) => {
+    setPrefilledJob({
+      title: job.title,
+      description: `${job.title} at ${job.company} (${job.location}).\nRequirements & Overview: ${job.description_snippet}\nKey Skills: ${job.matched_skills.join(", ")}`,
+    });
+    handleTabChange("matcher");
   };
 
   const scrollToScanner = () => {
@@ -102,6 +124,7 @@ export default function Home() {
               <AtsStudio
                 onNavigateToMatch={() => handleTabChange("matcher")}
                 onNavigateToInterview={() => handleTabChange("interview")}
+                onResumeUploaded={handleResumeUploaded}
               />
               <FaqAndFooter />
             </motion.div>
@@ -116,7 +139,28 @@ export default function Home() {
               transition={{ duration: 0.3 }}
             >
               <JobMatchStudio
+                activeResumeId={activeResumeId}
+                initialJobTitle={prefilledJob?.title}
+                initialJobDescription={prefilledJob?.description}
+                onMatchComplete={(matchId) => setActiveJobMatchId(matchId)}
                 onStartInterview={() => handleTabChange("interview")}
+              />
+              <FaqAndFooter />
+            </motion.div>
+          )}
+
+          {currentTab === "scout" && (
+            <motion.div
+              key="scout"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <JobScoutStudio
+                activeResumeId={activeResumeId}
+                onMatchJob={handleMatchFromScout}
+                onInterviewPrep={() => handleTabChange("interview")}
               />
               <FaqAndFooter />
             </motion.div>
@@ -130,7 +174,10 @@ export default function Home() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <InterviewStudio />
+              <InterviewStudio
+                activeResumeId={activeResumeId}
+                activeJobMatchId={activeJobMatchId}
+              />
               <FaqAndFooter />
             </motion.div>
           )}

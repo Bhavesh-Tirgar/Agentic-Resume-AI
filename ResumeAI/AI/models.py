@@ -3,6 +3,7 @@ from .Models.JobMatchResult import JobMatchResult
 from .Models.ResumeAnalysisResult import ResumeAnalysisResult
 from .Models.ResumeParserResult import ResumeParserResult
 from .Models.ResumeScoreResult import ResumeScoreResult
+from .Models.JobDiscoveryResult import JobDiscoveryResult
 
 __all__ = [
     "InterviewPlanResult",
@@ -10,4 +11,5 @@ __all__ = [
     "ResumeAnalysisResult",
     "ResumeParserResult",
     "ResumeScoreResult",
+    "JobDiscoveryResult",
 ]

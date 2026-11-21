@@ -231,3 +231,61 @@ export async function listUserResumesApi(): Promise<any[]> {
 
   return res.json();
 }
+
+
+// 8. Active Resume ID Persistence
+export const getActiveResumeId = (): number => {
+  if (typeof window === "undefined") return 1;
+  const stored = localStorage.getItem("resume_ai_active_id");
+  return stored ? parseInt(stored, 10) : 1;
+};
+
+export const setActiveResumeId = (id: number) => {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("resume_ai_active_id", id.toString());
+  }
+};
+
+// 9. Job Discovery Scout API
+export async function discoverJobsApi(
+  resumeId: number,
+  location: string = "Ahmedabad, India",
+  workType: string = "All"
+): Promise<{
+  message: string;
+  discovery_id: number;
+  location_query: string;
+  work_type: string;
+  discovery_data: any;
+}> {
+  const headers = await getHeaders();
+  const res = await fetch(`${API_BASE}/ai/resume/${resumeId}/job-finder/`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      location,
+      work_type: workType,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Job discovery failed");
+  }
+
+  return res.json();
+}
+
+export async function getDiscoveredJobsApi(resumeId: number): Promise<any> {
+  const headers = await getHeaders();
+  const res = await fetch(`${API_BASE}/ai/resume/${resumeId}/job-finder/`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to load discovered jobs");
+  }
+
+  return res.json();
+}
