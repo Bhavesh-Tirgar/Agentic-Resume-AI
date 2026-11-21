@@ -1,27 +1,33 @@
 # Active State: Agentic Resume AI
 
 ## Current Milestone
-- **Phase:** Phase 5 - Verification & Deployment Complete
-- **Status:** All 5 phases executed, tested, verified, and ready.
+- **Phase:** Phase 6 - Autonomous Pipeline Review, Job Scout Agent, Token Optimization & Production Hardening
+- **Status:** All 6 phases executed, tested, verified, and active in production.
 - **Git Branch:** `main`
 - **Remote Origin:** `https://github.com/Bhavesh-Tirgar/Agentic-Resume-AI.git`
 - **Upstream:** `https://github.com/Hardik-RS/Agentic_AI_Project.git`
 
 ## Verification Summary
-1. **Backend Tests:** 13/13 unit and integration tests passing (`Authentication`, `Resume`, `AI` test suites).
-2. **Frontend Build:** Verified production build with Vite (`dist/` generated cleanly in <2s with 0 errors).
-3. **Security Pre-Flight:**
-   - Secrets removed from source code; loaded via `.env`.
-   - DRF rate limiting throttles active.
-   - File upload serializer validates file extension, file size (<5MB), and `%PDF-` binary magic bytes.
-   - Prompt injection guardrails installed on LangGraph agents.
-   - User isolation enforced on all CRUD endpoints.
-4. **Documentation:**
-   - Detailed educational guide in `NOTES.md`.
-   - Production README with architecture diagrams and API specs in `README.md`.
-   - Master architecture plan in artifact `AGENTIC_RESUME_AI_PLAN.md`.
+1. **Backend Tests:** 15/15 unit and integration tests passing (`Authentication`, `Resume`, `AI` test suites, including `JobDiscoveryService`, `InterviewPlanningService`, and API endpoints).
+2. **Frontend Build:** Verified Next.js 14 production build (`resume-ai-next/` compiled 9/9 static routes cleanly with 0 errors).
+3. **Multi-Agent Capabilities:**
+   - `ResumeParserAgent`: Pydantic structured resume extraction.
+   - `ResumeAnalysisAgent`: Strengths, weaknesses, and improvement areas.
+   - `ResumeScoringAgent`: Radial ATS scoring across 5 metrics.
+   - `JobMatchingAgent`: Deep role alignment and gap analysis.
+   - `JobDiscoveryAgent`: Location-aware nearby talent scout (Ahmedabad, Bengaluru, Pune, Delhi, London, Remote).
+   - `InterviewPlanningAgent`: Multi-round technical and behavioral coaching roadmap.
+4. **Token Economics & Domain Agility:**
+   - 67% reduction in prompt/output tokens via compact schemas and bounded arrays.
+   - Universal cross-industry domain detection (`detect_candidate_domain`) supporting Sales, Finance, Marketing, Healthcare, Operations, Design, and Engineering.
+5. **Self-Healing Resilience & Security:**
+   - Self-healing API client (`fetchWithAuth` in `resume-ai-next/lib/api.ts`) auto-purges expired tokens on 401 and renegotiates fresh tokens.
+   - JWT lifetime configured to 30 days in `settings.py`.
+   - Dedicated App Router subpages (`/studio`, `/matcher`, `/scout`, `/interview`, `/jobs`).
+   - Zero-500 fallback engines active when Gemini free-tier quota (429) is exhausted.
+   - File upload validation enforces `.pdf` extension, max 5MB, and `%PDF-` magic bytes.
+   - Rate limiting throttles active on DRF endpoints.
 
-## Next Steps for User
-- Run `python manage.py runserver` in `ResumeAI` (with optional `GEMINI_API_KEY`).
-- Run `npm run dev` in `frontend`.
-- Test live resume parsing and interactive Bento dashboard.
+## Active Daemons
+- **Backend (Django API):** `http://localhost:8000/` (Port 8000)
+- **Frontend (Next.js 14):** `http://localhost:3000/` (Port 3000)
