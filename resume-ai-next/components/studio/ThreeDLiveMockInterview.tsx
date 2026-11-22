@@ -127,11 +127,13 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         recognition.lang = "en-US";
 
         recognition.onresult = (event: any) => {
-          let transcript = "";
+          let accumulated = "";
           for (let i = 0; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript + " ";
+            accumulated += event.results[i][0].transcript + " ";
           }
-          setCurrentAnswer((prev) => (transcript.trim().length > prev.length ? transcript.trim() : prev));
+          if (accumulated.trim()) {
+            setCurrentAnswer(accumulated.trim());
+          }
         };
 
         recognition.onerror = () => setIsListening(false);
@@ -196,9 +198,9 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       setSecondsRemaining(TOTAL_INTERVIEW_SECONDS);
       setIsTimerActive(true);
       
-      // Marcus greets and asks the first question
-      const openingSpeech = `${res.greeting} ${res.question}`;
-      setTextToSpeak(openingSpeech);
+      // Marcus speaks a concise, natural opening greeting
+      const punchySpeech = `Welcome ${resolvedName}. Walk me through a key project or challenge you led as a ${resolvedRole}.`;
+      setTextToSpeak(punchySpeech);
     } catch (err: any) {
       alert("Failed to start 3D mock interview: " + (err.message || "Unknown error"));
     } finally {
@@ -215,6 +217,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     }
 
     setIsSubmitting(true);
+    setAvatarState("thinking");
     const submittedText = currentAnswer.trim();
     const snapshot = cameraRef.current?.captureSnapshot();
 
@@ -241,6 +244,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         return copy;
       });
 
+      setAvatarState("idle");
       setLatestFeedback(res.evaluation.critique);
       setCurrentAnswer("");
 
@@ -253,10 +257,19 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         setTextToSpeak(res.next_question);
       }
     } catch (err: any) {
+      setAvatarState("idle");
       alert("Error submitting answer: " + (err.message || "Unknown error"));
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleStopSpeaking = () => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setTextToSpeak(null);
+    setAvatarState("idle");
   };
 
   const handleFinishInterview = async () => {
@@ -663,6 +676,7 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
             onSpeechEnd={() => setAvatarState("idle")}
             isMuted={isMuted}
             onToggleMute={() => setIsMuted(!isMuted)}
+            onStopSpeaking={handleStopSpeaking}
             className="h-[340px]"
           />
         </div>
@@ -680,14 +694,26 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
             <MessageSquare className="w-4 h-4" />
             <span>Marcus Vance:</span>
           </span>
-          <button
-            onClick={() => setTextToSpeak(currentQuestion)}
-            className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
-            title="Replay Marcus's voice question"
-          >
-            <Volume2 className="w-3.5 h-3.5" />
-            <span>Replay Audio</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {avatarState === "speaking" && (
+              <button
+                onClick={handleStopSpeaking}
+                className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition cursor-pointer border border-rose-500/20 font-sans"
+                title="Stop audio speech"
+              >
+                <VolumeX className="w-3.5 h-3.5" />
+                <span>Stop Voice</span>
+              </button>
+            )}
+            <button
+              onClick={() => setTextToSpeak(currentQuestion)}
+              className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#191d28] text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer border border-slate-200 dark:border-[#272d3b] font-sans"
+              title="Replay Marcus's voice question"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>Replay Audio</span>
+            </button>
+          </div>
         </div>
         <p className="text-sm font-medium text-slate-900 dark:text-white leading-relaxed">
           {currentQuestion || "Preparing question..."}

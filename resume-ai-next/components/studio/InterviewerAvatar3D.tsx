@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { Volume2, VolumeX, Sparkles, Mic, User } from "lucide-react";
 
-export type AvatarState = "idle" | "speaking" | "listening";
+export type AvatarState = "idle" | "speaking" | "listening" | "thinking";
 
 interface InterviewerAvatar3DProps {
   state?: AvatarState;
@@ -12,6 +12,7 @@ interface InterviewerAvatar3DProps {
   className?: string;
   isMuted?: boolean;
   onToggleMute?: () => void;
+  onStopSpeaking?: () => void;
 }
 
 export function InterviewerAvatar3D({
@@ -21,6 +22,7 @@ export function InterviewerAvatar3D({
   className = "",
   isMuted = false,
   onToggleMute,
+  onStopSpeaking,
 }: InterviewerAvatar3DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mousePos = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
@@ -172,6 +174,10 @@ export function InterviewerAvatar3D({
       } else if (internalState === "listening") {
         auraGrad.addColorStop(0, "rgba(59, 130, 246, 0.20)");
         auraGrad.addColorStop(0.5, "rgba(139, 92, 246, 0.10)");
+        auraGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+      } else if (internalState === "thinking") {
+        auraGrad.addColorStop(0, "rgba(139, 92, 246, 0.28)");
+        auraGrad.addColorStop(0.5, "rgba(59, 130, 246, 0.16)");
         auraGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
       } else {
         auraGrad.addColorStop(0, "rgba(148, 163, 184, 0.08)");
@@ -406,13 +412,27 @@ export function InterviewerAvatar3D({
               ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 animate-pulse"
               : internalState === "listening"
               ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+              : internalState === "thinking"
+              ? "bg-purple-500/20 text-purple-400 border-purple-500/30 animate-pulse"
               : "bg-slate-800/60 text-zinc-400 border-white/5"
           }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${
-              internalState === "speaking" ? "bg-emerald-400 animate-ping" : internalState === "listening" ? "bg-blue-400" : "bg-zinc-500"
+              internalState === "speaking" ? "bg-emerald-400 animate-ping" : internalState === "listening" ? "bg-blue-400" : internalState === "thinking" ? "bg-purple-400 animate-ping" : "bg-zinc-500"
             }`} />
-            <span className="capitalize">{internalState}</span>
+            <span className="capitalize">{internalState === "thinking" ? "Evaluating..." : internalState}</span>
           </span>
+
+          {/* Stop Speaking Button if currently speaking */}
+          {internalState === "speaking" && onStopSpeaking && (
+            <button
+              onClick={onStopSpeaking}
+              className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 backdrop-blur-md text-[10px] font-mono transition cursor-pointer border border-rose-500/30 flex items-center gap-1"
+              title="Stop voice speech"
+            >
+              <VolumeX className="w-3 h-3" />
+              <span>Silence</span>
+            </button>
+          )}
 
           {/* Mute / Unmute Button */}
           {onToggleMute && (
