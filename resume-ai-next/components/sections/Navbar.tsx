@@ -61,12 +61,6 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
           <div className="flex items-center gap-1.5">
             <span className="font-bold text-sm tracking-tight text-slate-900 dark:text-white">ResumeAI</span>
             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-[#1c202a] text-slate-500 dark:text-[#8c96a8] border border-slate-200 dark:border-[#272d3b]">v2.4</span>
-            {isApiLive && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>AI Engine Online</span>
-              </span>
-            )}
           </div>
         </button>
 

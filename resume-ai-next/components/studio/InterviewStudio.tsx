@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { INTERVIEW_QUESTIONS } from "@/lib/demoData";
 import { createInterviewPlanApi, getInterviewPlanApi, getActiveResumeId } from "@/lib/api";
-import { LiveMockInterview } from "./LiveMockInterview";
+import { ThreeDLiveMockInterview } from "./ThreeDLiveMockInterview";
 
 interface InterviewStudioProps {
   activeResumeId?: number;
@@ -150,8 +150,8 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId, initialRole 
           }`}
         >
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
-          <span>Live Virtual HR Interview</span>
+          <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+          <span>3D Live Mock Interview (Marcus Vance)</span>
         </button>
 
         <button
@@ -168,7 +168,7 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId, initialRole 
       </div>
 
       {activeMode === "live-hr" ? (
-        <LiveMockInterview activeResumeId={activeResumeId} initialRole={initialRole} />
+        <ThreeDLiveMockInterview activeResumeId={activeResumeId} initialRole={initialRole} />
       ) : (
         <>
           {/* Header */}
