@@ -362,6 +362,14 @@ export async function startVirtualHRInterviewApi(payload: {
 export async function sendVirtualHRAnswerApi(payload: {
   session_id: string;
   candidate_answer: string;
+  vision_telemetry?: {
+    eye_contact_percentage: number;
+    confidence_score: number;
+    nervousness_score: number;
+    gaze_direction: string;
+    facial_demeanor: string;
+  };
+  snapshot_base64?: string;
 }): Promise<{
   session_id: string;
   round_evaluated: number;
@@ -373,9 +381,18 @@ export async function sendVirtualHRAnswerApi(payload: {
     clarity_score: number;
     strengths: string[];
     critique: string;
+    behavioral_critique?: string;
+    adaptive_hr_tone?: string;
     hr_followup_or_next_question: string;
     question_category: string;
     is_final_round: boolean;
+    vision?: {
+      eye_contact_percentage: number;
+      confidence_score: number;
+      nervousness_score: number;
+      gaze_direction: string;
+      facial_demeanor: string;
+    };
   };
   next_question?: string;
 }> {
@@ -406,6 +423,14 @@ export async function finishVirtualHRInterviewApi(session_id: string): Promise<{
     top_strengths: string[];
     critical_gaps: string[];
     preparation_recommendations: string[];
+    behavioral_delivery?: {
+      average_eye_contact: number;
+      average_confidence: number;
+      composure_under_pressure: number;
+      executive_presence_grade: string;
+      presence_strengths: string[];
+      presence_areas_to_improve: string[];
+    };
   };
   turns: any[];
 }> {

@@ -352,6 +352,8 @@ class VirtualHRTurnView(APIView):
     def post(self, request):
         session_id = request.data.get("session_id")
         candidate_answer = request.data.get("candidate_answer", "")
+        vision_telemetry = request.data.get("vision_telemetry")
+        snapshot_base64 = request.data.get("snapshot_base64")
 
         if not session_id:
             return Response({"error": "session_id is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -361,7 +363,12 @@ class VirtualHRTurnView(APIView):
         try:
             from AI.Services.VirtualHRService import VirtualHRService
             service = VirtualHRService()
-            result = service.evaluate_turn(session_id, candidate_answer)
+            result = service.evaluate_turn(
+                session_id=session_id, 
+                candidate_answer=candidate_answer,
+                client_telemetry=vision_telemetry,
+                snapshot_base64=snapshot_base64
+            )
             return Response(result, status=status.HTTP_200_OK)
         except ValueError as exc:
             return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)

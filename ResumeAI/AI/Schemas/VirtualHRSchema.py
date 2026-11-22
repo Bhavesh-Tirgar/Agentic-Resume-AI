@@ -2,6 +2,70 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+class VisionTelemetry(BaseModel):
+    """Vision and behavioral biometric telemetry detected from camera feed."""
+    eye_contact_percentage: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Estimated direct eye contact percentage during response (0-100)."
+    )
+    confidence_score: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Confidence & composure level inferred from posture and facial expression (0-100)."
+    )
+    nervousness_score: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Nervousness, micro-fidgeting, or tension index (0-100)."
+    )
+    gaze_direction: str = Field(
+        "Direct / Focused",
+        description="Gaze assessment: Direct / Focused, Looking Away, Looking Down, or Reading Second Screen."
+    )
+    facial_demeanor: str = Field(
+        "Composed",
+        description="Facial expression: Composed, Calm, Tense / Anxious, Engaged, or Hesitant."
+    )
+
+
+class BehavioralScorecard(BaseModel):
+    """Executive presence, body language, and poise assessment."""
+    average_eye_contact: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Overall average eye contact maintained across interview rounds."
+    )
+    average_confidence: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Average confidence rating across all questions."
+    )
+    composure_under_pressure: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Ability to remain relaxed and composed when faced with difficult scenarios."
+    )
+    executive_presence_grade: str = Field(
+        ...,
+        description="Executive presence rating: Tier-1 Executive Presence, Strong & Composed, Competent, or Anxious / Needs Coaching."
+    )
+    presence_strengths: List[str] = Field(
+        default_factory=list,
+        description="Key delivery, eye-contact, and poise strengths."
+    )
+    presence_areas_to_improve: List[str] = Field(
+        default_factory=list,
+        description="Actionable coaching tips on body language and eye contact."
+    )
+
+
 class InterviewTurnEvaluation(BaseModel):
     """Evaluation of candidate's answer for an individual interview round."""
     star_score: int = Field(
@@ -14,7 +78,7 @@ class InterviewTurnEvaluation(BaseModel):
         ...,
         ge=0,
         le=100,
-        description="Communication clarity, conciseness, and executive presence (0-100)."
+        description="Communication clarity, conciseness, and articulation (0-100)."
     )
     strengths: List[str] = Field(
         default_factory=list,
@@ -22,11 +86,19 @@ class InterviewTurnEvaluation(BaseModel):
     )
     critique: str = Field(
         ...,
-        description="Immediate, constructive coaching tip on how to elevate the response."
+        description="Constructive coaching tip on the content of the answer."
+    )
+    behavioral_critique: str = Field(
+        "Maintained steady composure and good eye contact.",
+        description="Constructive tip regarding body language, eye contact, or nervous pacing."
+    )
+    adaptive_hr_tone: str = Field(
+        "Direct / Structured",
+        description="Tone selected by Virtual HR: Encouraging / Calming, Probing / Challenging, or Direct / Structured."
     )
     hr_followup_or_next_question: str = Field(
         ...,
-        description="Virtual HR's next question or contextual follow-up probing question."
+        description="Virtual HR's next question adaptively tuned to both answer content and candidate demeanor."
     )
     question_category: str = Field(
         "Behavioral",
@@ -35,6 +107,10 @@ class InterviewTurnEvaluation(BaseModel):
     is_final_round: bool = Field(
         False,
         description="Whether this was the final interview question in the session."
+    )
+    vision: Optional[VisionTelemetry] = Field(
+        None,
+        description="Vision and behavioral telemetry metrics for this turn."
     )
 
 
@@ -89,4 +165,8 @@ class InterviewFinalScorecard(BaseModel):
     preparation_recommendations: List[str] = Field(
         default_factory=list,
         description="Specific actionable drills for candidate's upcoming real interviews."
+    )
+    behavioral_delivery: Optional[BehavioralScorecard] = Field(
+        None,
+        description="Comprehensive body language, eye contact, and executive presence analysis."
     )
