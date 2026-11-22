@@ -179,10 +179,6 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId, initialRole 
                 <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-zinc-400">
                   STAR Question Bank
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-[#191d27] border border-slate-200 dark:border-[#272d3b] text-slate-600 dark:text-zinc-300 flex items-center gap-1">
-                  <Server className="w-3 h-3 text-emerald-500" />
-                  <span>AI Engine Ready</span>
-                </span>
               </div>
               <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
                 STAR Method Practice Questions

@@ -359,9 +359,27 @@ export async function startVirtualHRInterviewApi(payload: {
   return res.json();
 }
 
+export async function transcribeWhisperAudioApi(audioBase64: string): Promise<{
+  transcribed_text: string;
+  model: string;
+}> {
+  const res = await fetchWithAuth("/ai/interview/live/whisper/", {
+    method: "POST",
+    body: JSON.stringify({ audio_base64: audioBase64 }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Whisper transcription failed");
+  }
+
+  return res.json();
+}
+
 export async function sendVirtualHRAnswerApi(payload: {
   session_id: string;
-  candidate_answer: string;
+  candidate_answer?: string;
+  audio_base64?: string;
   vision_telemetry?: {
     eye_contact_percentage: number;
     confidence_score: number;
@@ -376,6 +394,8 @@ export async function sendVirtualHRAnswerApi(payload: {
   next_round: number;
   max_rounds: number;
   is_final_round: boolean;
+  transcribed_text?: string;
+  used_whisper?: boolean;
   evaluation: {
     star_score: number;
     clarity_score: number;

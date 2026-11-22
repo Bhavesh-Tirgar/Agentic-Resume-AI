@@ -346,32 +346,60 @@ class VirtualHRStartView(APIView):
 
 
 class VirtualHRTurnView(APIView):
-    """Processes a candidate answer, returns STAR critique and next question."""
+    """Processes a candidate answer via Whisper audio transcription or direct text, returning STAR critique and next question."""
     permission_classes = [AllowAny]
 
     def post(self, request):
         session_id = request.data.get("session_id")
         candidate_answer = request.data.get("candidate_answer", "")
+        audio_file = request.FILES.get("audio")
+        audio_base64 = request.data.get("audio_base64")
         vision_telemetry = request.data.get("vision_telemetry")
         snapshot_base64 = request.data.get("snapshot_base64")
 
         if not session_id:
             return Response({"error": "session_id is required."}, status=status.HTTP_400_BAD_REQUEST)
-        if not candidate_answer.strip():
-            return Response({"error": "candidate_answer cannot be empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Require at least one form of input
+        if not audio_file and not audio_base64 and not candidate_answer.strip():
+            return Response({"error": "Audio recording or text answer is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            from AI.Services.VirtualHRService import VirtualHRService
-            service = VirtualHRService()
-            result = service.evaluate_turn(
-                session_id=session_id, 
-                candidate_answer=candidate_answer,
+            from AI.Services.InterviewAgent import InterviewAgent
+            agent = InterviewAgent()
+            result = agent.process_turn(
+                session_id=session_id,
+                audio_file=audio_file,
+                audio_base64=audio_base64,
+                text_answer=candidate_answer,
                 client_telemetry=vision_telemetry,
                 snapshot_base64=snapshot_base64
             )
             return Response(result, status=status.HTTP_200_OK)
         except ValueError as exc:
             return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class WhisperTranscribeView(APIView):
+    """Direct Whisper audio speech-to-text endpoint."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        audio_file = request.FILES.get("audio")
+        audio_base64 = request.data.get("audio_base64")
+
+        if not audio_file and not audio_base64:
+            return Response({"error": "Audio file or audio_base64 is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from AI.Services.WhisperAudioService import WhisperAudioService
+            if audio_file:
+                text = WhisperAudioService.transcribe(audio_file)
+            else:
+                text = WhisperAudioService.transcribe_base64(audio_base64)
+            return Response({"transcription": text}, status=status.HTTP_200_OK)
         except Exception as exc:
             return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

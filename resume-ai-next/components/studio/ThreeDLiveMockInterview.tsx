@@ -5,12 +5,13 @@ import {
   Mic, MicOff, Volume2, VolumeX, Send, RefreshCw, 
   Sparkles, CheckCircle2, UserCheck, MessageSquare, 
   Download, ArrowRight, Clock, AlertTriangle, ShieldCheck,
-  ChevronRight, Play, RotateCcw
+  ChevronRight, Play, RotateCcw, Radio
 } from "lucide-react";
 import { 
   startVirtualHRInterviewApi, 
   sendVirtualHRAnswerApi, 
   finishVirtualHRInterviewApi, 
+  transcribeWhisperAudioApi,
   getActiveResumeId 
 } from "@/lib/api";
 import { InterviewerAvatar3D, AvatarState } from "./InterviewerAvatar3D";
@@ -74,9 +75,14 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
   // Camera HUD reference
   const cameraRef = useRef<CameraFeedHUDRef>(null);
 
-  // Voice Speech Recognition
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  // Native Audio Recording via MediaRecorder + Whisper
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 5-Minute Timer Countdown Loop
   useEffect(() => {
@@ -103,7 +109,6 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     setIsTimerActive(false);
     if (sessionId && !scorecard && !isFinishing) {
       setIsFinishing(true);
-      setTextToSpeak("That completes our five-minute executive screening. I'm compiling your final evaluation scorecard now.");
       try {
         const res = await finishVirtualHRInterviewApi(sessionId);
         setScorecard(res.scorecard);
@@ -116,58 +121,109 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     }
   }, [sessionId, scorecard, isFinishing, onFinish]);
 
-  // Setup Web Speech API speech recognition
+  // Cleanup media recording on unmount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = "en-US";
-
-        recognition.onresult = (event: any) => {
-          let accumulated = "";
-          for (let i = 0; i < event.results.length; i++) {
-            accumulated += event.results[i][0].transcript + " ";
-          }
-          if (accumulated.trim()) {
-            setCurrentAnswer(accumulated.trim());
-          }
-        };
-
-        recognition.onerror = () => setIsListening(false);
-        recognition.onend = () => setIsListening(false);
-
-        recognitionRef.current = recognition;
-      }
-    }
     return () => {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (_) {}
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, []);
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert("Speech recognition is not supported in this browser. You can type your response.");
-      return;
+  // Start microphone recording using native HTML5 MediaRecorder
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      audioChunksRef.current = [];
+
+      let mimeType = "audio/webm";
+      if (!MediaRecorder.isTypeSupported("audio/webm")) {
+        mimeType = ""; // use browser default
+      }
+
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.start(250); // collect 250ms chunks
+      setIsRecordingVoice(true);
+      setRecordingSeconds(0);
+      setAvatarState("listening");
+
+      // Start recording seconds counter
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err: any) {
+      alert("Microphone access denied or not available. Please allow mic permissions in your browser or type your answer below.");
+    }
+  };
+
+  // Stop recording and send audio to local Whisper engine
+  const stopRecordingAndTranscribe = async () => {
+    if (!mediaRecorderRef.current || !isRecordingVoice) return;
+
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
     }
 
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-      setAvatarState("idle");
-    } else {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-        setAvatarState("listening");
-      } catch (err) {
-        console.error("Microphone start failed:", err);
+    const recorder = mediaRecorderRef.current;
+
+    recorder.onstop = async () => {
+      // Release mic stream
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
       }
-    }
+
+      setIsRecordingVoice(false);
+      const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+
+      if (audioBlob.size < 500) {
+        setAvatarState("idle");
+        return;
+      }
+
+      // Convert Blob to base64
+      setIsTranscribing(true);
+      setAvatarState("thinking");
+
+      try {
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64Audio = reader.result as string;
+          try {
+            const res = await transcribeWhisperAudioApi(base64Audio);
+            const transcribed = res.transcribed_text?.trim() || "";
+            if (transcribed) {
+              setCurrentAnswer((prev) => (prev ? `${prev} ${transcribed}` : transcribed));
+            }
+          } catch (err: any) {
+            console.error("Whisper transcription failed:", err);
+            alert("Whisper speech-to-text error: " + (err.message || "Failed to transcribe audio"));
+          } finally {
+            setIsTranscribing(false);
+            setAvatarState("idle");
+          }
+        };
+      } catch (err: any) {
+        console.error("FileReader failed:", err);
+        setIsTranscribing(false);
+        setAvatarState("idle");
+      }
+    };
+
+    recorder.stop();
   };
 
   const handleStartInterview = async () => {
@@ -197,12 +253,10 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       setScorecard(null);
       setSecondsRemaining(TOTAL_INTERVIEW_SECONDS);
       setIsTimerActive(true);
-      
-      // Marcus speaks a concise, natural opening greeting
-      const punchySpeech = `Welcome ${resolvedName}. Walk me through a key project or challenge you led as a ${resolvedRole}.`;
-      setTextToSpeak(punchySpeech);
+      // No robotic auto-TTS speech. Marcus Vance's question is displayed crisply on screen.
+      setTextToSpeak(null);
     } catch (err: any) {
-      alert("Failed to start 3D mock interview: " + (err.message || "Unknown error"));
+      alert("Failed to start mock interview: " + (err.message || "Unknown error"));
     } finally {
       setIsStarting(false);
     }
@@ -211,9 +265,8 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
   const handleSubmitAnswer = async () => {
     if (!sessionId || !currentAnswer.trim() || isSubmitting) return;
 
-    if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
+    if (isRecordingVoice) {
+      await stopRecordingAndTranscribe();
     }
 
     setIsSubmitting(true);
@@ -229,7 +282,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       });
 
       // Update turn record
-      setTurns(prev => {
+      setTurns((prev) => {
         const copy = [...prev];
         if (copy.length > 0) {
           copy[copy.length - 1].answer = submittedText;
@@ -249,12 +302,12 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       setCurrentAnswer("");
 
       if (res.is_final_round) {
-        // Auto-finalize interview
         handleFinishInterview();
       } else if (res.next_question) {
         setCurrentRound(res.next_round);
         setCurrentQuestion(res.next_question);
-        setTextToSpeak(res.next_question);
+        // Do not force auto-TTS. Candidate can read question and press "Listen" if preferred.
+        setTextToSpeak(null);
       }
     } catch (err: any) {
       setAvatarState("idle");
@@ -281,7 +334,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       const res = await finishVirtualHRInterviewApi(sessionId);
       setScorecard(res.scorecard);
       onFinish?.(res.scorecard);
-      setTextToSpeak("Excellent work. I have compiled your full executive interview scorecard. You can review your strengths and key areas for real interviews below.");
+      setTextToSpeak(null);
     } catch (err: any) {
       alert("Error generating scorecard: " + (err.message || "Unknown error"));
     } finally {
@@ -328,6 +381,11 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
   const timeFormatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   const timerPct = (secondsRemaining / TOTAL_INTERVIEW_SECONDS) * 100;
 
+  // Format recording seconds MM:SS
+  const recMin = Math.floor(recordingSeconds / 60);
+  const recSec = recordingSeconds % 60;
+  const recFormatted = `${String(recMin).padStart(2, "0")}:${String(recSec).padStart(2, "0")}`;
+
   // 1. Setup Screen (Before Starting)
   if (!sessionId) {
     return (
@@ -340,7 +398,7 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-                3D Executive Mock Interview
+                Executive Mock Interview
               </h2>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold">
                 Live 5-Min Sprint
@@ -411,7 +469,7 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
             <span>How the 5-Minute Sprint Works</span>
           </div>
           <p className="text-slate-600 dark:text-zinc-400 leading-relaxed">
-            Marcus will conduct a focused 4-round executive technical evaluation. You can speak into your microphone or type. After each question, you'll receive immediate feedback to sharpen your STAR delivery.
+            Marcus will conduct a focused 4-round executive technical evaluation. You can speak into your microphone using OpenAI Whisper voice capture or type your answers. After each question, you'll receive immediate feedback to sharpen your STAR delivery.
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px] font-mono">
             <div className="p-2 rounded-lg bg-white dark:bg-[#1a1e29] border border-slate-200 dark:border-[#252b3a] text-center">
@@ -443,12 +501,12 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
             {isStarting ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Launching 3D Stage...</span>
+                <span>Launching Interview Stage...</span>
               </>
             ) : (
               <>
                 <Play className="w-4 h-4 fill-current" />
-                <span>Launch 5-Minute 3D Interview</span>
+                <span>Launch 5-Minute Mock Interview</span>
               </>
             )}
           </button>
@@ -521,17 +579,17 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
             Executive Summary
           </h3>
-          <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed bg-white dark:bg-[#13161f] p-4 rounded-xl border border-slate-200 dark:border-[#1e2330]">
-            {scorecard.summary}
+          <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed bg-white dark:bg-[#141720] p-4 rounded-xl border border-slate-200 dark:border-[#1e2330]">
+            {scorecard.summary || "Candidate demonstrated clear technical execution and solid alignment with role competencies."}
           </p>
         </div>
 
         {/* Strengths & Recommendations */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div className="p-4 rounded-xl bg-white dark:bg-[#13161f] border border-slate-200 dark:border-[#1e2330] space-y-2">
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Key Strengths Observed</span>
+          <div className="p-4 rounded-xl bg-white dark:bg-[#141720] border border-slate-200 dark:border-[#1e2330] space-y-2">
+            <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Key Strengths</span>
             </span>
             <ul className="space-y-1.5 text-slate-600 dark:text-zinc-400">
               {(scorecard.top_strengths || []).map((s: string, idx: number) => (
@@ -543,10 +601,10 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
             </ul>
           </div>
 
-          <div className="p-4 rounded-xl bg-white dark:bg-[#13161f] border border-slate-200 dark:border-[#1e2330] space-y-2">
-            <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4" />
-              <span>Tips for Real Interviews</span>
+          <div className="p-4 rounded-xl bg-white dark:bg-[#141720] border border-slate-200 dark:border-[#1e2330] space-y-2">
+            <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-blue-500" />
+              <span>Recommendations</span>
             </span>
             <ul className="space-y-1.5 text-slate-600 dark:text-zinc-400">
               {(scorecard.preparation_recommendations || []).map((r: string, idx: number) => (
@@ -592,7 +650,7 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
   // 3. Active 3D Interview Stage
   return (
     <div className="w-full max-w-5xl mx-auto space-y-5">
-      {/* Top 3D Control Bar with 5-Minute Timer */}
+      {/* Top Control Bar with 5-Minute Timer */}
       <div className="rounded-2xl border border-slate-200 dark:border-[#202533] bg-white/80 dark:bg-[#111318]/90 backdrop-blur-md p-4 shadow-lg flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500 font-bold text-xs">
@@ -616,7 +674,6 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
         {/* 5-Minute Live Circular Clock */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#161922] border border-slate-200 dark:border-[#252b3a]">
-            {/* Circular Time Indicator */}
             <svg className="w-5 h-5 -rotate-90" viewBox="0 0 36 36">
               <path
                 className="text-slate-200 dark:text-zinc-700"
@@ -663,12 +720,12 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
         </div>
       </div>
 
-      {/* 3D Dual-Portal Stage (Perspective Container) */}
+      {/* 3D Dual-Portal Stage */}
       <div 
         style={{ perspective: 1200 }}
         className="grid grid-cols-1 md:grid-cols-2 gap-5"
       >
-        {/* Left 3D Portal: Marcus Vance Avatar */}
+        {/* Left Portal: Marcus Vance Avatar */}
         <div className="transform transition-transform duration-300 hover:rotate-y-1">
           <InterviewerAvatar3D
             state={avatarState}
@@ -681,7 +738,7 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
           />
         </div>
 
-        {/* Right 3D Portal: Candidate Video Feed */}
+        {/* Right Portal: Candidate Video Feed */}
         <div className="transform transition-transform duration-300 hover:-rotate-y-1">
           <CameraFeedHUD ref={cameraRef} className="h-[340px]" />
         </div>
@@ -702,16 +759,20 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
                 title="Stop audio speech"
               >
                 <VolumeX className="w-3.5 h-3.5" />
-                <span>Stop Voice</span>
+                <span>Stop Audio</span>
               </button>
             )}
             <button
-              onClick={() => setTextToSpeak(currentQuestion)}
+              onClick={() => {
+                if (currentQuestion) {
+                  setTextToSpeak(currentQuestion);
+                }
+              }}
               className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#191d28] text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer border border-slate-200 dark:border-[#272d3b] font-sans"
-              title="Replay Marcus's voice question"
+              title="Play question audio"
             >
               <Volume2 className="w-3.5 h-3.5" />
-              <span>Replay Audio</span>
+              <span>Listen</span>
             </button>
           </div>
         </div>
@@ -720,7 +781,7 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
         </p>
       </div>
 
-      {/* Latest Constructive Feedback Tip */}
+      {/* Latest Constructive Coaching Tip */}
       {latestFeedback && (
         <div className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-500/10 via-blue-500/5 to-transparent border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5">
           <Sparkles className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
@@ -731,41 +792,76 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
         </div>
       )}
 
-      {/* Candidate Response Console (Speak or Type) */}
+      {/* Candidate Response Console (Whisper Voice + Text) */}
       <div className="rounded-2xl border border-slate-200 dark:border-[#202533] bg-white dark:bg-[#111318] p-5 shadow-lg space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-            <Mic className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Your Response</span>
-          </span>
-
-          <button
-            onClick={toggleListening}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
-              isListening
-                ? "bg-rose-500 text-white animate-pulse"
-                : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs"
-            }`}
-          >
-            {isListening ? (
-              <>
-                <MicOff className="w-3.5 h-3.5" />
-                <span>Stop Mic</span>
-              </>
-            ) : (
-              <>
-                <Mic className="w-3.5 h-3.5" />
-                <span>Speak Answer</span>
-              </>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <Mic className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Your Response</span>
+            </span>
+            {isRecordingVoice && (
+              <span className="flex items-center gap-1.5 text-[11px] font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                <span>Recording {recFormatted}</span>
+              </span>
             )}
-          </button>
+            {isTranscribing && (
+              <span className="flex items-center gap-1.5 text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                <span>Whisper Transcribing...</span>
+              </span>
+            )}
+          </div>
+
+          {/* Voice Record Toggle Button */}
+          <div className="flex items-center gap-2">
+            {!isRecordingVoice ? (
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={isTranscribing || isSubmitting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer shadow-xs disabled:opacity-40"
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>Record Voice</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={stopRecordingAndTranscribe}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer shadow-xs animate-pulse"
+              >
+                <MicOff className="w-3.5 h-3.5" />
+                <span>Done Speaking</span>
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* Live Audio Waveform Animation while recording */}
+        {isRecordingVoice && (
+          <div className="flex items-center justify-center gap-1 py-2 bg-slate-50 dark:bg-[#151821] rounded-xl border border-slate-200 dark:border-[#262b3a]">
+            <span className="text-[11px] font-mono text-slate-500 mr-2">Speaking...</span>
+            {[40, 70, 90, 50, 100, 65, 80, 45, 95, 60, 85, 30].map((h, i) => (
+              <span
+                key={i}
+                className="w-1 bg-emerald-500 rounded-full animate-pulse"
+                style={{
+                  height: `${Math.max(8, (h * (recordingSeconds % 3 + 1)) % 28)}px`,
+                  animationDelay: `${i * 80}ms`
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Answer Text Area */}
         <textarea
           rows={3}
           value={currentAnswer}
           onChange={(e) => setCurrentAnswer(e.target.value)}
-          placeholder="Speak into your microphone or type your STAR response here (Situation, Task, Action, Result)..."
+          placeholder="Speak with the mic button above, or type your response here..."
           className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-[#262b3a] bg-slate-50 dark:bg-[#151821] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 text-xs focus:outline-hidden focus:border-emerald-500 transition leading-relaxed resize-none"
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -777,18 +873,18 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
 
         <div className="flex items-center justify-between pt-1">
           <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500">
-            Press Ctrl+Enter or click Submit
+            {isRecordingVoice ? "Click 'Done Speaking' to transcribe" : "Press Ctrl+Enter or Submit"}
           </span>
 
           <button
             onClick={handleSubmitAnswer}
-            disabled={!currentAnswer.trim() || isSubmitting}
+            disabled={!currentAnswer.trim() || isSubmitting || isTranscribing}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-semibold text-xs hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-40"
           >
             {isSubmitting ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Evaluating Response...</span>
+                <span>Evaluating...</span>
               </>
             ) : (
               <>

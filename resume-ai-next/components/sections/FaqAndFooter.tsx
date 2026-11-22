@@ -89,7 +89,7 @@ export function FaqAndFooter() {
               GitHub
             </a>
             <span>•</span>
-            <span className="text-emerald-600 dark:text-emerald-400">Enterprise AI Engine</span>
+            <span className="text-emerald-600 dark:text-emerald-400">Production Ready</span>
           </div>
         </div>
       </footer>
