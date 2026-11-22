@@ -20,9 +20,9 @@ export function AtsScannerSection({ onOpenStudio, onResumeScanned, initialFile }
   const [hasScanned, setHasScanned] = useState(false);
   const [copied, setCopied] = useState(false);
   const [scanScore, setScanScore] = useState(91);
-  const [scanStatus, setScanStatus] = useState("Tier-1 Screen Pass Verified");
+  const [scanStatus, setScanStatus] = useState("ATS Ready — High Compatibility");
   const [bulletSample, setBulletSample] = useState(
-    "Architected 14+ REST endpoints in DRF, cutting p99 latency to <45ms across 18k DAU."
+    "Led cross-functional software delivery, improving application response time by 42% across 18,000 active users."
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -61,7 +61,7 @@ export function AtsScannerSection({ onOpenStudio, onResumeScanned, initialFile }
         const processRes = await processResumeApi(uploadRes.resume_id);
         const score = processRes.score_data?.overall || 91;
         setScanScore(score);
-        setScanStatus(score >= 90 ? "Tier-1 Screen Pass Verified" : "Competitive Candidate Profile");
+        setScanStatus(score >= 90 ? "ATS Ready — High Compatibility" : "Competitive Candidate Profile");
 
         if (processRes.analysis_data?.strengths?.length) {
           setBulletSample(processRes.analysis_data.strengths[0]);
@@ -96,13 +96,13 @@ export function AtsScannerSection({ onOpenStudio, onResumeScanned, initialFile }
       <div className="text-center mb-8 space-y-2">
         <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#111318] border border-slate-200 dark:border-[#20242e] text-[11px] font-mono text-slate-500 dark:text-zinc-400">
           <Server className="w-3 h-3 text-emerald-500" />
-          <span>Enterprise ATS Diagnostic Engine</span>
+          <span>Instant AI Resume Checker</span>
         </div>
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
           Live ATS Resume Scanner
         </h2>
         <p className="text-slate-600 dark:text-[#8c96a8] text-xs sm:text-sm max-w-lg mx-auto">
-          Drop your PDF or run the demonstration to inspect compatibility across automated hiring screeners.
+          Upload your resume (PDF) to check how well it reads with ATS scanners and get immediate suggestions.
         </p>
       </div>
 

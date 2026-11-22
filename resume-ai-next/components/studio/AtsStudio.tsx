@@ -280,6 +280,11 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
             {parsed_data.name}
+            {data.resume_id === 101 && (
+              <span className="ml-2 text-xs font-normal text-slate-400 dark:text-zinc-500">
+                (Sample Preview)
+              </span>
+            )}
           </h1>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <p className="text-xs text-slate-500 dark:text-zinc-400">
@@ -388,6 +393,25 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
         <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
           <span>{statusNotice}</span>
+        </div>
+      )}
+
+      {/* Sample Preview Notice if using demo data */}
+      {data.resume_id === 101 && (
+        <div className="p-4 rounded-xl bg-gradient-to-r from-blue-500/10 via-emerald-500/5 to-transparent border border-blue-500/20 text-xs text-slate-700 dark:text-zinc-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+            <span>
+              You are currently viewing a <strong>Sample Demo Resume</strong>. Upload your own resume (PDF) to get real-time score auditing and personalized bullet rewrites.
+            </span>
+          </div>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shrink-0 cursor-pointer transition shadow-xs"
+          >
+            <UploadCloud className="w-3.5 h-3.5" />
+            <span>Upload Your PDF</span>
+          </button>
         </div>
       )}
 

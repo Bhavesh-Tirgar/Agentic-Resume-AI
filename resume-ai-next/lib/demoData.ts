@@ -129,12 +129,12 @@ export const INITIAL_DOSSIER: AtsResultData = {
     ]
   },
   parsed_data: {
-    name: "Alex Morgan",
+    name: "Sample Candidate (Preview)",
     title: "Senior Solutions & Operations Specialist",
-    location: "New York, NY (or Remote)",
-    email: "alex.morgan@example.com",
-    linkedin: "linkedin.com/in/alexmorgan-profile",
-    github: "github.com/alexmorgan-profile",
+    location: "San Francisco, CA (or Remote)",
+    email: "candidate@example.com",
+    linkedin: "linkedin.com/in/sample-profile",
+    github: "github.com/sample-profile",
     skills: {
       languages: ["Strategic Planning", "Cross-Functional Leadership", "Process Optimization", "Client Management"],
       frameworks: ["Enterprise Operations", "Agile & Scrum Delivery", "Vendor Governance", "Data Analytics"],
@@ -145,7 +145,7 @@ export const INITIAL_DOSSIER: AtsResultData = {
     experience: [
       {
         role: "Senior Solutions & Delivery Specialist",
-        organization: "Apex Global Solutions",
+        organization: "Sample Enterprise Solutions",
         location: "New York, NY",
         duration: "2022 — Present",
         bullets: [

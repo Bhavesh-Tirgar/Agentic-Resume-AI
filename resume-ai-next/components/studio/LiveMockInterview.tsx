@@ -3,9 +3,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   Mic, MicOff, Volume2, VolumeX, Send, RefreshCw, 
-  Sparkles, CheckCircle2, AlertCircle, Award, Target, 
-  Download, ArrowRight, UserCheck, MessageSquare, ChevronRight,
-  Eye, Activity, ShieldCheck, HeartHandshake, Zap
+  Sparkles, CheckCircle2, UserCheck, MessageSquare, 
+  Download, ArrowRight, ArrowLeft
 } from "lucide-react";
 import { 
   startVirtualHRInterviewApi, 
@@ -13,7 +12,7 @@ import {
   finishVirtualHRInterviewApi, 
   getActiveResumeId 
 } from "@/lib/api";
-import { CameraFeedHUD, CameraFeedHUDRef, VisionTelemetryData } from "./CameraFeedHUD";
+import { CameraFeedHUD, CameraFeedHUDRef } from "./CameraFeedHUD";
 
 interface LiveMockInterviewProps {
   activeResumeId?: number;
@@ -25,18 +24,13 @@ interface TurnRecord {
   round: number;
   question: string;
   answer?: string;
-  star_score?: number;
-  clarity_score?: number;
-  critique?: string;
-  behavioral_critique?: string;
-  eye_contact_percentage?: number;
-  facial_demeanor?: string;
+  feedback?: string;
 }
 
 export function LiveMockInterview({ activeResumeId, initialRole, onFinish }: LiveMockInterviewProps) {
-  const [roleInput, setRoleInput] = useState(initialRole || "Senior Software Engineer");
-  const [candidateNameInput, setCandidateNameInput] = useState("Alex Morgan");
-  const [maxRounds, setMaxRounds] = useState(4);
+  const [roleInput, setRoleInput] = useState(initialRole || "");
+  const [candidateNameInput, setCandidateNameInput] = useState("");
+  const [maxRounds, setMaxRounds] = useState(3);
   
   // Session states
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -48,15 +42,7 @@ export function LiveMockInterview({ activeResumeId, initialRole, onFinish }: Liv
   
   // Turn history
   const [turns, setTurns] = useState<TurnRecord[]>([]);
-  const [latestFeedback, setLatestFeedback] = useState<{
-    star_score: number;
-    clarity_score: number;
-    critique: string;
-    behavioral_critique?: string;
-    adaptive_hr_tone?: string;
-    eye_contact_percentage?: number;
-    facial_demeanor?: string;
-  } | null>(null);
+  const [latestFeedback, setLatestFeedback] = useState<string | null>(null);
 
   // Scorecard
   const [scorecard, setScorecard] = useState<any | null>(null);
@@ -88,13 +74,8 @@ export function LiveMockInterview({ activeResumeId, initialRole, onFinish }: Liv
           setCurrentAnswer((prev) => (transcript.trim().length > prev.length ? transcript.trim() : prev));
         };
 
-        recognition.onerror = () => {
-          setIsListening(false);
-        };
-
-        recognition.onend = () => {
-          setIsListening(false);
-        };
+        recognition.onerror = () => setIsListening(false);
+        recognition.onend = () => setIsListening(false);
 
         recognitionRef.current = recognition;
       }
@@ -132,7 +113,7 @@ export function LiveMockInterview({ activeResumeId, initialRole, onFinish }: Liv
   // Toggle voice recognition
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      alert("Speech recognition is not supported in this browser. You can type your answer in the box.");
+      alert("Speech-to-text is not supported in this browser. You can type your answer in the box.");
       return;
     }
 
@@ -153,9 +134,11 @@ export function LiveMockInterview({ activeResumeId, initialRole, onFinish }: Liv
     setIsStarting(true);
     try {
       const resumeId = activeResumeId || getActiveResumeId();
+      const nameToSend = candidateNameInput.trim() || "Candidate";
+      const roleToSend = roleInput.trim() || "Software Engineer";
       const res = await startVirtualHRInterviewApi({
-        candidate_name: candidateNameInput,
-        target_role: roleInput,
+        candidate_name: nameToSend,
+        target_role: roleToSend,
         resume_id: resumeId,
         max_rounds: maxRounds
       });
@@ -191,32 +174,21 @@ export function LiveMockInterview({ activeResumeId, initialRole, onFinish }: Liv
 
     setIsSubmitting(true);
     const submittedText = currentAnswer.trim();
-
-    // Pull live camera telemetry and snapshot thumbnail
-    const telemetry = cameraRef.current?.getTelemetry();
     const snapshot = cameraRef.current?.captureSnapshot();
 
     try {
       const res = await sendVirtualHRAnswerApi({
         session_id: sessionId,
         candidate_answer: submittedText,
-        vision_telemetry: telemetry,
         snapshot_base64: snapshot || undefined
       });
 
-      const visData = res.evaluation.vision;
-
-      // Update current turn with answer & evaluation
+      // Update current turn with answer & feedback
       setTurns(prev => {
         const copy = [...prev];
         if (copy.length > 0) {
           copy[copy.length - 1].answer = submittedText;
-          copy[copy.length - 1].star_score = res.evaluation.star_score;
-          copy[copy.length - 1].clarity_score = res.evaluation.clarity_score;
-          copy[copy.length - 1].critique = res.evaluation.critique;
-          copy[copy.length - 1].behavioral_critique = res.evaluation.behavioral_critique;
-          copy[copy.length - 1].eye_contact_percentage = visData?.eye_contact_percentage;
-          copy[copy.length - 1].facial_demeanor = visData?.facial_demeanor;
+          copy[copy.length - 1].feedback = res.evaluation.critique;
         }
         if (!res.is_final_round && res.next_question) {
           copy.push({
@@ -227,20 +199,10 @@ export function LiveMockInterview({ activeResumeId, initialRole, onFinish }: Liv
         return copy;
       });
 
-      setLatestFeedback({
-        star_score: res.evaluation.star_score,
-        clarity_score: res.evaluation.clarity_score,
-        critique: res.evaluation.critique,
-        behavioral_critique: res.evaluation.behavioral_critique,
-        adaptive_hr_tone: res.evaluation.adaptive_hr_tone,
-        eye_contact_percentage: visData?.eye_contact_percentage,
-        facial_demeanor: visData?.facial_demeanor
-      });
-
+      setLatestFeedback(res.evaluation.critique);
       setCurrentAnswer("");
 
       if (res.is_final_round) {
-        // Complete interview
         handleFinishInterview();
       } else if (res.next_question) {
         setCurrentRound(res.next_round);
@@ -248,7 +210,7 @@ export function LiveMockInterview({ activeResumeId, initialRole, onFinish }: Liv
         handleSpeakQuestion(res.next_question);
       }
     } catch (err: any) {
-      alert("Error evaluating response: " + err.message);
+      alert("Error submitting answer: " + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -262,7 +224,7 @@ export function LiveMockInterview({ activeResumeId, initialRole, onFinish }: Liv
       setScorecard(res.scorecard);
       onFinish?.(res.scorecard);
     } catch (err: any) {
-      alert("Error finalizing scorecard: " + err.message);
+      alert("Error completing interview: " + err.message);
     } finally {
       setIsFinishing(false);
     }
@@ -270,125 +232,105 @@ export function LiveMockInterview({ activeResumeId, initialRole, onFinish }: Liv
 
   const handleExportScorecard = () => {
     if (!scorecard) return;
-    const bd = scorecard.behavioral_delivery || {};
-    const report = `# Virtual HR Candidate Evaluation Report
-**Candidate:** ${candidateNameInput}
-**Target Role:** ${roleInput}
-**Overall Score:** ${scorecard.overall_score} / 100
-**Verdict:** ${scorecard.verdict}
+    const displayName = candidateNameInput.trim() || "Candidate";
+    const displayRole = roleInput.trim() || "Professional";
+    const report = `# Mock Interview Summary
+**Candidate:** ${displayName}
+**Target Role:** ${displayRole}
+**Status:** Completed (${turns.length} Questions Practiced)
 
-## Executive Summary
+## Overall Feedback
 ${scorecard.summary}
 
-## Competency Breakdown
-- Communication: ${scorecard.communication_score}%
-- Technical & Domain Depth: ${scorecard.technical_depth_score}%
-- Problem Solving: ${scorecard.problem_solving_score}%
-- Leadership & Ownership: ${scorecard.leadership_score}%
-
-${bd.average_eye_contact ? `## Executive Delivery & Body Language Scorecard
-- Average Eye Contact: ${bd.average_eye_contact}%
-- Composure Under Pressure: ${bd.composure_under_pressure}%
-- Presence Rating: ${bd.executive_presence_grade}
-- Delivery Strengths: ${(bd.presence_strengths || []).join(", ")}
-- Areas to Improve: ${(bd.presence_areas_to_improve || []).join(", ")}
-` : ""}
-
 ## Key Strengths
-${scorecard.top_strengths.map((s: string) => `- ${s}`).join("\n")}
+${(scorecard.top_strengths || []).map((s: string) => `- ${s}`).join("\n")}
 
-## Critical Gaps & Areas to Improve
-${scorecard.critical_gaps.map((g: string) => `- ${g}`).join("\n")}
+## Tips for Your Real Interview
+${(scorecard.preparation_recommendations || []).map((r: string) => `- ${r}`).join("\n")}
 
-## Recommended Preparation Drills
-${scorecard.preparation_recommendations.map((r: string) => `- ${r}`).join("\n")}
-
----
-*Generated by Virtual HR Mock Interviewer with Vision Telemetry*
+## Questions & Answers Practiced
+${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer:** ${t.answer || "N/A"}\n\n**Feedback:** ${t.feedback || "Good response."}\n`).join("\n---\n\n")}
 `;
     const blob = new Blob([report], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Interview_Scorecard_${candidateNameInput.replace(/\s+/g, "_")}.md`;
+    a.download = `Interview_Notes_${displayName.replace(/\s+/g, "_")}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  // State 1: Configuration / Pre-Interview Screen
+  // 1. Setup / Pre-Interview Screen
   if (!sessionId) {
     return (
-      <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-6 shadow-sm max-w-3xl mx-auto space-y-6">
+      <div className="rounded-2xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-6 sm:p-8 shadow-sm max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3 border-b border-slate-100 dark:border-[#1e2330] pb-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-            <UserCheck className="w-6 h-6" />
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+            <UserCheck className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              Virtual HR Mock Interview
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Mock Interview Simulator
             </h2>
             <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-              Practice a live interactive interview with Sarah (Principal Recruiter). Includes real-time eye-contact tracking and demeanor coaching.
+              Practice answering real interview questions with instant, helpful coaching.
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           <div>
-            <label className="font-medium text-slate-700 dark:text-zinc-300 block mb-1">
-              Candidate Name
+            <label className="font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+              Your Name
             </label>
             <input
               type="text"
               value={candidateNameInput}
               onChange={(e) => setCandidateNameInput(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#272d3b] bg-slate-50 dark:bg-[#161922] text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500"
-              placeholder="e.g. Alex Morgan"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-[#272d3b] bg-slate-50 dark:bg-[#161922] text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500 text-xs"
+              placeholder="e.g. Your Name (Optional)"
             />
           </div>
 
           <div>
-            <label className="font-medium text-slate-700 dark:text-zinc-300 block mb-1">
-              Target Position
+            <label className="font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+              Target Role
             </label>
             <input
               type="text"
               value={roleInput}
               onChange={(e) => setRoleInput(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#272d3b] bg-slate-50 dark:bg-[#161922] text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500"
-              placeholder="e.g. Senior Software Engineer"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-[#272d3b] bg-slate-50 dark:bg-[#161922] text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500 text-xs"
+              placeholder="e.g. Software Engineer, Product Manager"
             />
           </div>
         </div>
 
-        <div className="p-4 rounded-lg bg-slate-50 dark:bg-[#141720] border border-slate-200 dark:border-[#1e2330] space-y-2 text-xs">
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#141720] border border-slate-200 dark:border-[#1e2330] space-y-2 text-xs">
           <span className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
-            <Eye className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Interactive Camera & Behavioral Tracking</span>
+            <Sparkles className="w-4 h-4 text-emerald-500" />
+            <span>How it works</span>
           </span>
-          <ul className="space-y-1.5 text-slate-600 dark:text-zinc-400 list-disc list-inside">
-            <li><strong>Eye Contact & Focus:</strong> Monitors direct screen/camera gaze and detects reading from notes.</li>
-            <li><strong>Adaptive Questioning:</strong> Sarah adjusts tone dynamically—encouraging if you feel nervous, challenging if confident.</li>
-            <li><strong>Voice or Typing:</strong> Speak your answers into your microphone or type them in the response box.</li>
-            <li><strong>Private & Ephemeral:</strong> Video stream is processed in real time and never saved or stored.</li>
-          </ul>
+          <p className="text-slate-600 dark:text-zinc-400 leading-relaxed">
+            Sarah will ask you questions one by one. You can speak into your microphone or type your answer. After each question, you'll get immediate tips to help you shine in real interviews.
+          </p>
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-2">
           <button
             onClick={handleStartInterview}
             disabled={isStarting}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-semibold text-xs hover:opacity-90 transition cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
           >
             {isStarting ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Preparing Interview Room...</span>
+                <span>Preparing Questions...</span>
               </>
             ) : (
               <>
-                <span>Start Mock Interview</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <span>Start Practice</span>
+                <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
@@ -397,294 +339,159 @@ ${scorecard.preparation_recommendations.map((r: string) => `- ${r}`).join("\n")}
     );
   }
 
-  // State 2: Final Scorecard View
+  // 2. Final Summary Screen
   if (scorecard) {
-    const bd = scorecard.behavioral_delivery;
     return (
-      <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-6 shadow-sm max-w-4xl mx-auto space-y-6 animate-fadeIn">
-        {/* Header Bar */}
+      <div className="rounded-2xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-6 sm:p-8 shadow-sm max-w-3xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-[#1e2330]">
           <div>
-            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-              Executive Assessment Report
+            <span className="text-[11px] font-mono uppercase text-emerald-600 dark:text-emerald-400 font-semibold">
+              Interview Complete
             </span>
             <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
-              Candidate Hiring Scorecard
+              Practice Summary & Feedback
             </h2>
             <p className="text-xs text-slate-500 dark:text-zinc-400">
-              {candidateNameInput} • {roleInput}
+              {candidateNameInput.trim() || "Candidate"} • {roleInput.trim() || "Target Role"}
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={handleExportScorecard}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer shadow-xs"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Download Report</span>
+              <span>Save Notes</span>
             </button>
             <button
               onClick={() => {
                 setSessionId(null);
                 setScorecard(null);
               }}
-              className="px-3.5 py-2 rounded-lg text-xs font-medium border border-slate-200 dark:border-[#272d3b] text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#1a1f2b] transition cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-medium border border-slate-200 dark:border-[#272d3b] text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#1a1f2b] transition cursor-pointer"
             >
-              Start New Session
+              Practice Again
             </button>
           </div>
         </div>
 
-        {/* Scorecard Hero Banner */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-5 rounded-xl bg-slate-50 dark:bg-[#0c0e14] border border-slate-200 dark:border-[#1f2533]">
-          <div>
-            <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500 block mb-1">
-              Overall Hireability Score
-            </span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-extrabold text-slate-900 dark:text-white">
-                {scorecard.overall_score}
-              </span>
-              <span className="text-xs text-slate-400 dark:text-zinc-500 font-mono">/ 100</span>
-            </div>
-          </div>
-
-          <div>
-            <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500 block mb-1">
-              Hiring Bar Verdict
-            </span>
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
-              {scorecard.verdict}
-            </span>
-          </div>
-
-          <div className="sm:col-span-1">
-            <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500 block mb-1">
-              Interview Rounds
-            </span>
-            <span className="text-xs font-medium text-slate-700 dark:text-zinc-300">
-              {turns.length} Completed Rounds Evaluated
-            </span>
-          </div>
-
-          <div className="sm:col-span-3 pt-3 border-t border-slate-200/80 dark:border-[#1c212d] text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
-            <span className="font-semibold text-slate-900 dark:text-white">Recruiter Summary: </span>
+        {/* Recruiter Summary Box */}
+        <div className="p-4 sm:p-5 rounded-xl bg-slate-50 dark:bg-[#141720] border border-slate-200 dark:border-[#1e2330] space-y-2 text-xs">
+          <span className="font-semibold text-slate-900 dark:text-white text-xs block">
+            Overall Impression:
+          </span>
+          <p className="text-slate-700 dark:text-zinc-300 leading-relaxed text-xs">
             {scorecard.summary}
-          </div>
+          </p>
         </div>
 
-        {/* Behavioral Delivery & Body Language Section */}
-        {bd && (
-          <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 font-mono">
-                <Eye className="w-3.5 h-3.5" />
-                <span>Executive Delivery & Demeanor Rating</span>
-              </h3>
-              <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
-                {bd.executive_presence_grade}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-lg bg-white dark:bg-[#12151c] border border-slate-200 dark:border-[#202533] space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-600 dark:text-zinc-400">Average Eye Contact</span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">{bd.average_eye_contact}%</span>
-                </div>
-                <div className="w-full h-1.5 bg-slate-100 dark:bg-[#1c212d] rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${bd.average_eye_contact}%` }} />
-                </div>
-              </div>
-
-              <div className="p-3 rounded-lg bg-white dark:bg-[#12151c] border border-slate-200 dark:border-[#202533] space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-600 dark:text-zinc-400">Composure Under Pressure</span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">{bd.composure_under_pressure}%</span>
-                </div>
-                <div className="w-full h-1.5 bg-slate-100 dark:bg-[#1c212d] rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${bd.composure_under_pressure}%` }} />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
-              {bd.presence_strengths?.length > 0 && (
-                <div className="space-y-1">
-                  <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 uppercase font-bold block">
-                    Poise Strengths
-                  </span>
-                  <ul className="space-y-1 text-slate-700 dark:text-zinc-300">
-                    {bd.presence_strengths.map((s: string, idx: number) => (
-                      <li key={idx} className="flex items-start gap-1.5">
-                        <span className="text-emerald-500">✓</span>
-                        <span>{s}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {bd.presence_areas_to_improve?.length > 0 && (
-                <div className="space-y-1">
-                  <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 uppercase font-bold block">
-                    Delivery Coaching
-                  </span>
-                  <ul className="space-y-1 text-slate-700 dark:text-zinc-300">
-                    {bd.presence_areas_to_improve.map((tip: string, idx: number) => (
-                      <li key={idx} className="flex items-start gap-1.5">
-                        <span className="text-amber-500">→</span>
-                        <span>{tip}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 4 Competency Bars */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-900 dark:text-white">
-            Core Competency Breakdown
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5 p-3 rounded-lg border border-slate-100 dark:border-[#1a1f2b] bg-slate-50/50 dark:bg-[#13161f]">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-700 dark:text-zinc-300">Communication & Brevity</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">{scorecard.communication_score}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-200 dark:bg-[#202636] rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${scorecard.communication_score}%` }} />
-              </div>
-            </div>
-
-            <div className="space-y-1.5 p-3 rounded-lg border border-slate-100 dark:border-[#1a1f2b] bg-slate-50/50 dark:bg-[#13161f]">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-700 dark:text-zinc-300">Technical & Domain Depth</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">{scorecard.technical_depth_score}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-200 dark:bg-[#202636] rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${scorecard.technical_depth_score}%` }} />
-              </div>
-            </div>
-
-            <div className="space-y-1.5 p-3 rounded-lg border border-slate-100 dark:border-[#1a1f2b] bg-slate-50/50 dark:bg-[#13161f]">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-700 dark:text-zinc-300">Problem Solving & Rigor</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">{scorecard.problem_solving_score}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-200 dark:bg-[#202636] rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${scorecard.problem_solving_score}%` }} />
-              </div>
-            </div>
-
-            <div className="space-y-1.5 p-3 rounded-lg border border-slate-100 dark:border-[#1a1f2b] bg-slate-50/50 dark:bg-[#13161f]">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-700 dark:text-zinc-300">Leadership & Collaboration</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">{scorecard.leadership_score}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-200 dark:bg-[#202636] rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${scorecard.leadership_score}%` }} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Strengths & Recommendations */}
+        {/* Strengths & Tips */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl border border-slate-200 dark:border-[#20242e] bg-slate-50 dark:bg-[#111318] space-y-2.5">
-            <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Key Strengths</span>
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] space-y-2">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span>What You Did Well</span>
             </h4>
-            <ul className="space-y-1.5 text-xs text-slate-700 dark:text-zinc-300">
-              {scorecard.top_strengths.map((str: string, i: number) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="text-emerald-500">•</span>
+            <ul className="space-y-1.5 text-xs text-slate-600 dark:text-zinc-400">
+              {(scorecard.top_strengths || []).map((str: string, i: number) => (
+                <li key={i} className="flex items-start gap-1.5">
+                  <span className="text-emerald-500 shrink-0">•</span>
                   <span>{str}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="p-4 rounded-xl border border-slate-200 dark:border-[#20242e] bg-slate-50 dark:bg-[#111318] space-y-2.5">
-            <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-              <span>Recommended Drills</span>
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] space-y-2">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-blue-500" />
+              <span>Tips for the Real Interview</span>
             </h4>
-            <ul className="space-y-1.5 text-xs text-slate-700 dark:text-zinc-300">
-              {scorecard.preparation_recommendations.map((rec: string, i: number) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="text-blue-500">•</span>
+            <ul className="space-y-1.5 text-xs text-slate-600 dark:text-zinc-400">
+              {(scorecard.preparation_recommendations || []).map((rec: string, i: number) => (
+                <li key={i} className="flex items-start gap-1.5">
+                  <span className="text-blue-500 shrink-0">•</span>
                   <span>{rec}</span>
                 </li>
               ))}
             </ul>
           </div>
         </div>
+
+        {/* Questions Practiced Review */}
+        <div className="space-y-3 pt-2">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+            Questions Reviewed ({turns.length})
+          </h4>
+          <div className="space-y-3">
+            {turns.map((t, idx) => (
+              <div key={idx} className="p-3.5 rounded-xl border border-slate-100 dark:border-[#1e2330] bg-slate-50/50 dark:bg-[#13161f] space-y-1.5 text-xs">
+                <p className="font-semibold text-slate-900 dark:text-white">
+                  Q{idx + 1}: {t.question}
+                </p>
+                {t.answer && (
+                  <p className="text-slate-600 dark:text-zinc-400 italic">
+                    "{t.answer}"
+                  </p>
+                )}
+                {t.feedback && (
+                  <p className="text-emerald-700 dark:text-emerald-400 text-[11px] pt-1 border-t border-slate-200/50 dark:border-[#1e2330]">
+                    💡 <strong>Coaching:</strong> {t.feedback}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
-  // State 3: Active Live Turn-by-Turn Room with Camera HUD
+  // 3. Active Turn-by-Turn Room
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 shadow-sm max-w-5xl mx-auto space-y-5">
+    <div className="rounded-2xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 sm:p-6 shadow-sm max-w-4xl mx-auto space-y-5">
       {/* Header Info */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#1e2330]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-              Mock Interview • {roleInput}
-            </h3>
-            <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-              Interviewer: Sarah (Talent Partner & Bar Raiser)
-            </p>
-          </div>
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+            Mock Interview • {roleInput}
+          </h3>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-mono bg-slate-100 dark:bg-[#191d27] border border-slate-200 dark:border-[#272d3b] text-slate-700 dark:text-zinc-300">
-            Round {currentRound} of {maxRounds}
+        <div className="flex items-center gap-2.5">
+          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-[#191d27] text-slate-600 dark:text-zinc-400">
+            Question {currentRound} of {maxRounds}
           </span>
           <button
             onClick={handleFinishInterview}
             disabled={isFinishing}
-            className="px-3 py-1 text-xs font-medium text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+            className="px-3 py-1 text-xs font-medium text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
           >
-            {isFinishing ? "Finalizing..." : "Finish Early"}
+            {isFinishing ? "Finishing..." : "End Practice"}
           </button>
         </div>
       </div>
 
-      {/* Split-Screen: Sarah Interviewer Card (Left) vs Live Camera HUD (Right) */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
-        {/* Left Column: Sarah's Question & Dialogue (7 Cols) */}
-        <div className="md:col-span-7 space-y-4">
-          <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 space-y-2">
+      {/* Main Grid: Interviewer Question (Left) & Clean Video (Right) */}
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-start">
+        {/* Sarah's Question Card (7 cols) */}
+        <div className="sm:col-span-7 space-y-3">
+          <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 space-y-2.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 font-mono">
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Sarah (Virtual HR)</span>
-                </span>
-                {latestFeedback?.adaptive_hr_tone && (
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
-                    Tone: {latestFeedback.adaptive_hr_tone}
-                  </span>
-                )}
-              </div>
+              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Interviewer</span>
+              </span>
 
               <button
                 onClick={() => handleSpeakQuestion(currentQuestion)}
-                className="flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
-                title="Listen to Sarah speak this question"
+                className="flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer font-medium"
+                title="Read question out loud"
               >
                 {isSpeaking ? <VolumeX className="w-3.5 h-3.5 text-rose-500" /> : <Volume2 className="w-3.5 h-3.5" />}
-                <span>{isSpeaking ? "Stop Voice" : "Hear Question"}</span>
+                <span>{isSpeaking ? "Stop Voice" : "Listen"}</span>
               </button>
             </div>
 
@@ -693,34 +500,21 @@ ${scorecard.preparation_recommendations.map((r: string) => `- ${r}`).join("\n")}
             </p>
           </div>
 
-          {/* Real-Time Turn Coaching Banner (if available) */}
+          {/* Conversational Coaching Tip */}
           {latestFeedback && (
-            <div className="p-3.5 rounded-lg border border-slate-200 dark:border-[#202533] bg-slate-50 dark:bg-[#0c0e14] space-y-2 text-xs">
-              <div className="flex items-center justify-between font-mono">
-                <span className="font-semibold text-slate-700 dark:text-zinc-300">Turn Feedback:</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">STAR Score: {latestFeedback.star_score}/100</span>
-                  <span className="text-slate-400 dark:text-zinc-500">|</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-bold">Clarity: {latestFeedback.clarity_score}/100</span>
-                </div>
-              </div>
-
-              <p className="text-slate-700 dark:text-zinc-300 leading-relaxed">
-                💡 <span className="font-semibold">Answer Content:</span> {latestFeedback.critique}
+            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-[#202533] bg-slate-50 dark:bg-[#0c0e14] text-xs space-y-1">
+              <span className="font-semibold text-slate-800 dark:text-zinc-200 block">
+                💡 Tip on your last answer:
+              </span>
+              <p className="text-slate-600 dark:text-zinc-400 leading-relaxed">
+                {latestFeedback}
               </p>
-
-              {latestFeedback.behavioral_critique && (
-                <div className="pt-2 border-t border-slate-200/60 dark:border-[#1c212d] flex items-start gap-1.5 text-emerald-700 dark:text-emerald-400">
-                  <Eye className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span><strong>Presence & Eye Contact:</strong> {latestFeedback.behavioral_critique}</span>
-                </div>
-              )}
             </div>
           )}
         </div>
 
-        {/* Right Column: Live Camera HUD & Gaze Tracker (5 Cols) */}
-        <div className="md:col-span-5 space-y-2">
+        {/* Clean Candidate Video Tile (5 cols) */}
+        <div className="sm:col-span-5">
           <CameraFeedHUD ref={cameraRef} />
         </div>
       </div>
@@ -728,8 +522,8 @@ ${scorecard.preparation_recommendations.map((r: string) => `- ${r}`).join("\n")}
       {/* Candidate Response Input Area */}
       <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-[#1e2330]">
         <div className="flex items-center justify-between text-xs">
-          <label className="font-medium text-slate-700 dark:text-zinc-300">
-            Your Response (Use the STAR Method: Situation, Task, Action, Result)
+          <label className="font-semibold text-slate-700 dark:text-zinc-300">
+            Your Answer
           </label>
           <button
             type="button"
@@ -741,33 +535,32 @@ ${scorecard.preparation_recommendations.map((r: string) => `- ${r}`).join("\n")}
             }`}
           >
             {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-emerald-500" />}
-            <span>{isListening ? "Listening... (Click to Stop)" : "Speak Response"}</span>
+            <span>{isListening ? "Listening... (Click to Finish)" : "Speak Answer"}</span>
           </button>
         </div>
 
         <textarea
-          rows={4}
+          rows={3}
           value={currentAnswer}
           onChange={(e) => setCurrentAnswer(e.target.value)}
-          placeholder="Describe the context, your specific responsibilities, the concrete action you executed, and the measurable business or technical results..."
+          placeholder="Speak or type your answer here... (Tip: Mention the situation, what action you took, and what the outcome was)"
           className="w-full p-3.5 text-xs rounded-xl border border-slate-200 dark:border-[#272d3b] bg-slate-50 dark:bg-[#141720] text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500 leading-relaxed resize-y"
         />
 
         <div className="flex items-center justify-between pt-1">
-          <span className="text-[11px] text-slate-400 dark:text-zinc-500 flex items-center gap-1">
-            <Eye className="w-3 h-3 text-emerald-500" />
-            <span>Keep your eyes on the screen/camera while answering for top composure scores.</span>
+          <span className="text-[11px] text-slate-400 dark:text-zinc-500">
+            Use the STAR format: Situation, Task, Action, and Result.
           </span>
 
           <button
             onClick={handleSubmitAnswer}
             disabled={!currentAnswer.trim() || isSubmitting}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-black font-semibold text-xs transition cursor-pointer active:scale-95 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-semibold text-xs transition cursor-pointer active:scale-95 disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Evaluating Response...</span>
+                <span>Checking Answer...</span>
               </>
             ) : (
               <>
