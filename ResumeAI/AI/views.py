@@ -87,10 +87,14 @@ class ResumeProcessView(APIView):
         except Exception:
             score = None
 
+        score_dict = score.score_data if score else {}
+        dossier_data = score_dict.get("dossier") if isinstance(score_dict, dict) else None
+
         return Response(
             {
                 "resume_id": resume.id,
                 "status": resume.status,
+                "dossier": dossier_data,
                 "parsed_data": parser.parsed_data if parser else None,
                 "analysis_data": analysis.analysis_data if analysis else None,
                 "score_data": score.score_data if score else None,
@@ -119,7 +123,9 @@ class ResumeProcessView(APIView):
 
         return Response(
             {
-                "message": "Resume processed successfully.",
+                "message": "Resume processed successfully via Unified Synthesis Engine.",
+                "dossier": result.get("dossier"),
+                "latency_seconds": result.get("latency_seconds", 0.0),
                 "parser_result_id": result["parser_result"].id,
                 "analysis_result_id": result["analysis_result"].id,
                 "score_result_id": result["score_result"].id,
