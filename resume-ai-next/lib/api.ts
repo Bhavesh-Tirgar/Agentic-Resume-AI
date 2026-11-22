@@ -344,6 +344,7 @@ export async function startVirtualHRInterviewApi(payload: {
   max_rounds: number;
   greeting: string;
   question: string;
+  audio_base64?: string;
   category: string;
 }> {
   const res = await fetchWithAuth("/ai/interview/live/start/", {
@@ -415,6 +416,7 @@ export async function sendVirtualHRAnswerApi(payload: {
     };
   };
   next_question?: string;
+  audio_base64?: string;
 }> {
   const res = await fetchWithAuth("/ai/interview/live/turn/", {
     method: "POST",

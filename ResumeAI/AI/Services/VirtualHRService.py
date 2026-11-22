@@ -64,16 +64,16 @@ class VirtualHRService:
             max_rounds=max_rounds
         )
 
-        greeting = (
-            f"Hello {resolved_name}, welcome to your 5-minute executive mock interview for the {resolved_role} position. "
-            f"I'm Marcus Vance, your interview lead today. We have exactly five minutes to evaluate your practical problem-solving approach and technical impact. "
-            f"Let's make every response count."
+        first_question = (
+            f"Hey {resolved_name}, great to meet you! Thanks for hopping on today. To get us rolling, tell me a bit about what you've been focused on recently, and walk me through a key project you're really proud of."
         )
 
-        first_question = (
-            f"To get started, walk me through a major technical project or operational challenge you led as a {resolved_role}. "
-            f"Specifically: what was the problem, what architectural or strategic action did you take, and what was the quantifiable business outcome?"
-        )
+        audio_b64 = None
+        try:
+            from AI.Services.RealVoiceService import RealVoiceService
+            audio_b64 = RealVoiceService.synthesize_to_base64(first_question)
+        except Exception as e:
+            logger.warning("Could not synthesize opening voice: %s", e)
 
         # Store initial question in session state
         session["current_question"] = first_question
@@ -92,8 +92,9 @@ class VirtualHRService:
             "target_role": resolved_role,
             "current_round": 1,
             "max_rounds": max_rounds,
-            "greeting": greeting,
+            "greeting": f"Hey {resolved_name}, welcome to your executive mock interview. Let's make every answer count.",
             "question": first_question,
+            "audio_base64": audio_b64,
             "category": "Experience & Impact"
         }
 
@@ -188,6 +189,15 @@ class VirtualHRService:
         session["turns"] = turns
         session_manager.save_session(session_id, session)
 
+        next_q = eval_result.hr_followup_or_next_question if not is_finished else None
+        audio_b64 = None
+        if next_q:
+            try:
+                from AI.Services.RealVoiceService import RealVoiceService
+                audio_b64 = RealVoiceService.synthesize_to_base64(next_q)
+            except Exception as e:
+                logger.warning("Could not synthesize follow-up voice: %s", e)
+
         return {
             "session_id": session_id,
             "round_evaluated": current_round,
@@ -195,7 +205,8 @@ class VirtualHRService:
             "max_rounds": max_rounds,
             "is_final_round": is_finished,
             "evaluation": eval_result.model_dump(),
-            "next_question": eval_result.hr_followup_or_next_question if not is_finished else None
+            "next_question": next_q,
+            "audio_base64": audio_b64
         }
 
     def finish_interview(self, session_id: str) -> Dict[str, Any]:

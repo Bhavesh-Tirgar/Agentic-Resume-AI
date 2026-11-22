@@ -75,6 +75,59 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
   // Camera HUD reference
   const cameraRef = useRef<CameraFeedHUDRef>(null);
 
+  // Neural Human Voice Audio Player (Marcus Vance)
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const currentAudioBase64Ref = useRef<string | null>(null);
+
+  const playNeuralAudio = useCallback((audioBase64?: string | null) => {
+    if (!audioBase64) return;
+    try {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current = null;
+      }
+      currentAudioBase64Ref.current = audioBase64;
+      const audio = new Audio(audioBase64);
+      audioPlayerRef.current = audio;
+      setAvatarState("speaking");
+
+      audio.onended = () => {
+        setAvatarState("idle");
+      };
+      audio.onerror = () => {
+        setAvatarState("idle");
+      };
+
+      audio.play().catch((err) => {
+        console.warn("Audio autoplay notice:", err);
+        setAvatarState("idle");
+      });
+    } catch (err) {
+      console.warn("Audio player error:", err);
+      setAvatarState("idle");
+    }
+  }, []);
+
+  const handleStopSpeaking = () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current = null;
+    }
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setTextToSpeak(null);
+    setAvatarState("idle");
+  };
+
+  const handleReplayAudio = () => {
+    if (currentAudioBase64Ref.current) {
+      playNeuralAudio(currentAudioBase64Ref.current);
+    } else if (currentQuestion) {
+      setTextToSpeak(currentQuestion);
+    }
+  };
+
   // Native Audio Recording via MediaRecorder + Whisper
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -253,8 +306,13 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       setScorecard(null);
       setSecondsRemaining(TOTAL_INTERVIEW_SECONDS);
       setIsTimerActive(true);
-      // No robotic auto-TTS speech. Marcus Vance's question is displayed crisply on screen.
       setTextToSpeak(null);
+
+      // Play Marcus Vance's natural human neural voice
+      if (res.audio_base64) {
+        currentAudioBase64Ref.current = res.audio_base64;
+        playNeuralAudio(res.audio_base64);
+      }
     } catch (err: any) {
       alert("Failed to start mock interview: " + (err.message || "Unknown error"));
     } finally {
@@ -306,8 +364,13 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       } else if (res.next_question) {
         setCurrentRound(res.next_round);
         setCurrentQuestion(res.next_question);
-        // Do not force auto-TTS. Candidate can read question and press "Listen" if preferred.
         setTextToSpeak(null);
+
+        // Play Marcus Vance's follow-up question with real neural voice
+        if (res.audio_base64) {
+          currentAudioBase64Ref.current = res.audio_base64;
+          playNeuralAudio(res.audio_base64);
+        }
       }
     } catch (err: any) {
       setAvatarState("idle");
@@ -315,14 +378,6 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleStopSpeaking = () => {
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-    setTextToSpeak(null);
-    setAvatarState("idle");
   };
 
   const handleFinishInterview = async () => {
@@ -753,27 +808,41 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
           </span>
           <div className="flex items-center gap-2">
             {avatarState === "speaking" && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[11px] font-mono">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Speaking</span>
+                <span className="flex items-center gap-0.5 ml-1">
+                  {[10, 16, 7, 14, 9].map((h, i) => (
+                    <span
+                      key={i}
+                      className="w-0.5 bg-emerald-500 rounded-full animate-pulse"
+                      style={{ height: `${h}px`, animationDelay: `${i * 120}ms` }}
+                    />
+                  ))}
+                </span>
+              </div>
+            )}
+            {avatarState === "speaking" ? (
               <button
+                type="button"
                 onClick={handleStopSpeaking}
                 className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition cursor-pointer border border-rose-500/20 font-sans"
-                title="Stop audio speech"
+                title="Stop audio voice"
               >
                 <VolumeX className="w-3.5 h-3.5" />
-                <span>Stop Audio</span>
+                <span>Stop Voice</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleReplayAudio}
+                className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#191d28] text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer border border-slate-200 dark:border-[#272d3b] font-sans"
+                title="Replay Marcus's voice question"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>Replay Voice</span>
               </button>
             )}
-            <button
-              onClick={() => {
-                if (currentQuestion) {
-                  setTextToSpeak(currentQuestion);
-                }
-              }}
-              className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#191d28] text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer border border-slate-200 dark:border-[#272d3b] font-sans"
-              title="Play question audio"
-            >
-              <Volume2 className="w-3.5 h-3.5" />
-              <span>Listen</span>
-            </button>
           </div>
         </div>
         <p className="text-sm font-medium text-slate-900 dark:text-white leading-relaxed">
