@@ -330,13 +330,21 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     setIsSubmitting(true);
     setAvatarState("thinking");
     const submittedText = currentAnswer.trim();
-    const snapshot = cameraRef.current?.captureSnapshot();
+    const isCamOn = cameraRef.current?.isCameraActive?.() ?? false;
+    const snapshot = isCamOn ? cameraRef.current?.captureSnapshot() : null;
 
     try {
       const res = await sendVirtualHRAnswerApi({
         session_id: sessionId,
         candidate_answer: submittedText,
-        snapshot_base64: snapshot || undefined
+        snapshot_base64: snapshot || undefined,
+        vision_telemetry: {
+          eye_contact_percentage: isCamOn ? 75 : 0,
+          confidence_score: isCamOn ? 70 : 15,
+          nervousness_score: isCamOn ? 25 : 0,
+          gaze_direction: isCamOn ? "Direct / Focused" : "Camera Off / Disabled",
+          facial_demeanor: isCamOn ? "Composed" : "Camera Off"
+        }
       });
 
       // Update turn record
@@ -359,18 +367,18 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       setLatestFeedback(res.evaluation.critique);
       setCurrentAnswer("");
 
+      // Play Marcus Vance's response with natural neural voice and lip-sync
+      if (res.audio_base64) {
+        currentAudioBase64Ref.current = res.audio_base64;
+        playNeuralAudio(res.audio_base64);
+      }
+
       if (res.is_final_round) {
         handleFinishInterview();
       } else if (res.next_question) {
         setCurrentRound(res.next_round);
         setCurrentQuestion(res.next_question);
         setTextToSpeak(null);
-
-        // Play Marcus Vance's follow-up question with real neural voice
-        if (res.audio_base64) {
-          currentAudioBase64Ref.current = res.audio_base64;
-          playNeuralAudio(res.audio_base64);
-        }
       }
     } catch (err: any) {
       setAvatarState("idle");

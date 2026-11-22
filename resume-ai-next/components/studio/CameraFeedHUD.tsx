@@ -5,6 +5,7 @@ import { Camera, CameraOff } from "lucide-react";
 
 export interface CameraFeedHUDRef {
   captureSnapshot: () => string | null;
+  isCameraActive: () => boolean;
 }
 
 interface CameraFeedHUDProps {
@@ -66,10 +67,11 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
       };
     }, [isCameraEnabled]);
 
-    // Expose capture method
+    // Expose capture and status methods
     useImperativeHandle(ref, () => ({
+      isCameraActive: () => streamActive && isCameraEnabled && !cameraError,
       captureSnapshot: () => {
-        if (!videoRef.current || !streamActive) return null;
+        if (!videoRef.current || !streamActive || !isCameraEnabled || cameraError) return null;
         try {
           const canvas = document.createElement("canvas");
           canvas.width = 320;

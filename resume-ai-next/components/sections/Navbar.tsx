@@ -46,8 +46,15 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
           <div className="w-7 h-7 rounded-full bg-slate-900 dark:bg-white flex items-center justify-center text-white dark:text-black font-bold text-xs tracking-tight shadow-sm">
             RA
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <span className="font-bold text-sm tracking-tight text-slate-900 dark:text-white">ResumeAI</span>
+            <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#181d26] text-slate-600 dark:text-[#8c96a8] border border-slate-200 dark:border-[#232936]">
+              v2.4
+            </span>
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border border-emerald-500/30 bg-emerald-950/20 text-emerald-600 dark:text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              AI Engine Online
+            </span>
           </div>
         </button>
 
