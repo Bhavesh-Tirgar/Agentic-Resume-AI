@@ -65,14 +65,14 @@ class VirtualHRService:
         )
 
         greeting = (
-            f"Hello {resolved_name}, welcome to your mock interview for the {resolved_role} position. "
-            f"I'm Sarah from the Talent Partner team. Today, we'll walk through a few situational and technical scenarios. "
-            f"Take your time, structure your responses, and share the specific impact of your work."
+            f"Hello {resolved_name}, welcome to your 5-minute executive mock interview for the {resolved_role} position. "
+            f"I'm Marcus Vance, your interview lead today. We have exactly five minutes to evaluate your practical problem-solving approach and technical impact. "
+            f"Let's make every response count."
         )
 
         first_question = (
-            f"To get started, tell me about a major project or challenging problem in your recent experience as a {resolved_role}. "
-            f"What was the situation, what specific action did you take, and what was the measurable outcome?"
+            f"To get started, walk me through a major technical project or operational challenge you led as a {resolved_role}. "
+            f"Specifically: what was the problem, what architectural or strategic action did you take, and what was the quantifiable business outcome?"
         )
 
         # Store initial question in session state
