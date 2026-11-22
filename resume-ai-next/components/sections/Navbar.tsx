@@ -90,7 +90,7 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
                 : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
-            ATS Studio
+            Resume Review
           </button>
           <button
             onClick={() => onTabChange("matcher")}
@@ -100,7 +100,7 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
                 : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
-            Job Matcher
+            Job Match
           </button>
           <button
             onClick={() => onTabChange("scout")}
@@ -110,7 +110,7 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
                 : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
-            <span>Job Scout</span>
+            <span>Job Finder</span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           </button>
           <button
@@ -121,7 +121,7 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
                 : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
-            Interview Cockpit
+            Interview Prep
           </button>
         </nav>
 
@@ -141,12 +141,12 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
             )}
           </button>
 
-          {/* Launch Studio CTA */}
+          {/* Primary Action Button */}
           <button
             onClick={onUploadClick || (() => onTabChange("studio"))}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold text-white dark:text-black bg-slate-900 dark:bg-white hover:opacity-90 shadow-sm transition-all active:scale-95 cursor-pointer"
           >
-            <span>Launch Studio</span>
+            <span>Review Resume</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
 
@@ -183,7 +183,7 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
               currentTab === "studio" ? "bg-slate-100 dark:bg-[#191d27] font-semibold" : "text-slate-600 dark:text-zinc-400"
             }`}
           >
-            ATS Studio & Dossier
+            Resume Review
           </button>
           <button
             onClick={() => {
@@ -194,7 +194,7 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
               currentTab === "matcher" ? "bg-slate-100 dark:bg-[#191d27] font-semibold" : "text-slate-600 dark:text-zinc-400"
             }`}
           >
-            Job Description Matcher
+            Job Match
           </button>
           <button
             onClick={() => {
@@ -205,7 +205,7 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
               currentTab === "scout" ? "bg-slate-100 dark:bg-[#191d27] font-semibold" : "text-slate-600 dark:text-zinc-400"
             }`}
           >
-            <span>Job Scout (Nearby Jobs)</span>
+            <span>Job Finder</span>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </button>
           <button
@@ -217,7 +217,7 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
               currentTab === "interview" ? "bg-slate-100 dark:bg-[#191d27] font-semibold" : "text-slate-600 dark:text-zinc-400"
             }`}
           >
-            STAR Interview Cockpit
+            Interview Prep
           </button>
 
           <div className="pt-2 border-t border-slate-100 dark:border-[#1e2330] flex items-center justify-between">

@@ -49,7 +49,7 @@ const SAMPLE_PROFILES: Record<IndustryKey, ProfileData> = {
     grade: "Top 4% Sales Tier",
     skills: ["B2B Negotiation", "Salesforce CRM", "Pipeline Growth", "Contract Closing", "Enterprise RFPs"],
     weakBullet: "Managed sales leads, met clients, and closed deals.",
-    strongBullet: "Generated ₹3.4 Cr net new ARR by expanding 28 enterprise accounts, exceeding annual target quota by 142%.",
+    strongBullet: "Generated $3.4M in net new ARR by expanding 28 enterprise accounts, exceeding annual target quota by 142%.",
     impact: "+42% ATS Score Impact"
   },
   finance: {
@@ -59,7 +59,7 @@ const SAMPLE_PROFILES: Record<IndustryKey, ProfileData> = {
     grade: "Executive Qualified",
     skills: ["Financial Modeling", "Budget Forecasting", "GAAP Compliance", "Statutory Audit", "ERP Systems"],
     weakBullet: "Handled company accounting entries, ledgers, and monthly tax filing.",
-    strongBullet: "Spearheaded quarterly financial audits across ₹42 Cr in assets with zero variances, optimizing operating expenses by 18%.",
+    strongBullet: "Spearheaded quarterly financial audits across $42M in assets with zero variances, optimizing operating expenses by 18%.",
     impact: "+38% ATS Score Impact"
   },
   marketing: {

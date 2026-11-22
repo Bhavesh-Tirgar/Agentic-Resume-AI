@@ -225,8 +225,8 @@ class InterviewPlanningView(APIView):
             if not match:
                 match = JobMatchingService.match_resume_to_job(
                     resume=resume,
-                    job_title="Senior AI Systems Engineer",
-                    job_description="Architect multi-agent backend pipelines and high-throughput microservices."
+                    job_title="Senior Solutions & Operations Specialist",
+                    job_description="Lead cross-functional project delivery, govern client SLAs, and optimize operational workflows."
                 )
             job_match_id = match.id
 
@@ -267,7 +267,7 @@ class JobDiscoveryView(APIView):
             try:
                 latest = JobDiscoveryService.discover_jobs(
                     resume=resume,
-                    location="Ahmedabad, India",
+                    location="Remote / Nationwide",
                     work_type="All"
                 )
             except Exception as exc:
@@ -289,7 +289,7 @@ class JobDiscoveryView(APIView):
 
     def post(self, request, resume_id):
         resume = get_user_resume_or_default(request.user, resume_id)
-        location = request.data.get("location", "Ahmedabad, India")
+        location = request.data.get("location", "Remote / Nationwide")
         work_type = request.data.get("work_type", "All")
 
         try:

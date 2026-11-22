@@ -14,7 +14,7 @@ export function FeaturesBento() {
 
   const fullLetterText = `Dear Hiring Director,
 
-Over the past 5 years, I scaled high-impact cross-functional initiatives delivering 45% faster execution, ₹3.2 Cr in operational revenue optimization, and verified SLA performance.
+Over the past 5 years, I scaled high-impact cross-functional initiatives delivering 45% faster execution, $3.2M in operational revenue optimization, and verified SLA performance.
 
 I would welcome the opportunity to bring this strategic focus to your organization.`;
 

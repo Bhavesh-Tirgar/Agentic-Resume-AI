@@ -271,11 +271,11 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
           <div className="flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${backendStatus === "connected" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}></span>
             <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-              Verified Technical Dossier
+              Resume Diagnostic
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-[#191d27] border border-slate-200 dark:border-[#272d3b] text-slate-600 dark:text-zinc-300 flex items-center gap-1">
               <Server className="w-3 h-3 text-emerald-500" />
-              <span>{backendStatus === "connected" ? "AI Engine Online" : "Offline Diagnostic Mode"}</span>
+              <span>{backendStatus === "connected" ? "AI Engine Ready" : "Demo Mode"}</span>
             </span>
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
@@ -309,12 +309,12 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
             {isScanning ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Invoking Backend API...</span>
+                <span>Scanning Resume...</span>
               </>
             ) : (
               <>
                 <UploadCloud className="w-3.5 h-3.5" />
-                <span>Upload PDF to Backend</span>
+                <span>Upload Resume</span>
               </>
             )}
           </button>
@@ -402,10 +402,10 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
                 <Layers className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Extracted Core Competencies & Domain Tools</span>
+                <span>Skills & Keywords Extracted</span>
               </h2>
               <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500">
-                {parsed_data.skills.all_extracted?.length || (parsed_data.skills.languages.length + parsed_data.skills.frameworks.length + parsed_data.skills.databases.length)} Keywords Parsed
+                {parsed_data.skills.all_extracted?.length || (parsed_data.skills.languages.length + parsed_data.skills.frameworks.length + parsed_data.skills.databases.length)} Keywords Found
               </span>
             </div>
 
@@ -413,7 +413,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
               {parsed_data.skills.all_extracted && parsed_data.skills.all_extracted.length > 0 ? (
                 <div>
                   <span className="text-slate-400 dark:text-zinc-500 text-[11px] uppercase font-mono block mb-2">
-                    Verified Industry Keywords & Stack
+                    Industry Keywords & Skills
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {parsed_data.skills.all_extracted.map((skill, i) => (
@@ -485,7 +485,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
           <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 shadow-sm transition-colors">
             <h2 className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
               <Building2 className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Production Experience & Bullet Verification</span>
+              <span>Work Experience</span>
             </h2>
 
             <div className="space-y-6">
@@ -517,7 +517,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
           {/* Academic Credentials */}
           <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 shadow-sm transition-colors">
             <h2 className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider mb-3">
-              Verified Academic Credentials
+              Education
             </h2>
             {parsed_data.education.map((edu, idx) => (
               <div key={idx} className="flex items-center justify-between text-xs">
@@ -541,7 +541,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
           <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 shadow-sm transition-colors">
             <div className="flex items-center justify-between mb-4">
               <span className="text-xs font-mono uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                Recruiter Audit Score
+                ATS Compatibility Score
               </span>
               <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                 {score_data.grade}
@@ -587,10 +587,10 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Strategic Bullet Point Diff</span>
+                <span>Suggested Bullet Improvements</span>
               </h2>
               <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500">
-                1-Click Copy
+                1-Click Apply
               </span>
             </div>
 
@@ -602,7 +602,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
                 >
                   <div>
                     <span className="text-[10px] font-mono uppercase text-rose-500 font-semibold block mb-0.5">
-                      Weak / Passive Original
+                      Before (Original)
                     </span>
                     <p className="text-slate-500 dark:text-zinc-400 line-through leading-relaxed">
                       "{rw.original}"
@@ -612,13 +612,13 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
                   <div>
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="text-[10px] font-mono uppercase text-emerald-600 dark:text-emerald-400 font-semibold">
-                        Calibrated Rewrite (Impact-Driven)
+                        After (High-Impact Rewrite)
                       </span>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleApplyRewrite(rw.rewritten, idx)}
                           className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition cursor-pointer font-medium"
-                          title="Apply this calibrated rewrite directly into your candidate experience bullets"
+                          title="Apply this rewrite directly to your resume bullets"
                         >
                           {appliedRewriteIndex === idx ? (
                             <>
@@ -656,7 +656,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
                   </div>
 
                   <p className="text-[11px] text-slate-500 dark:text-zinc-400 italic">
-                    Reason: {rw.reason}
+                    Why: {rw.reason}
                   </p>
                 </div>
               ))}
@@ -684,7 +684,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
                     : "text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300"
                 }`}
               >
-                Recruiter Gaps ({analysis_data.weaknesses.length})
+                Areas to Improve ({analysis_data.weaknesses.length})
               </button>
               <button
                 onClick={() => setActiveTab("improvements")}
@@ -694,7 +694,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
                     : "text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300"
                 }`}
               >
-                Calibrations ({analysis_data.improvements.length})
+                Action Steps ({analysis_data.improvements.length})
               </button>
             </div>
 

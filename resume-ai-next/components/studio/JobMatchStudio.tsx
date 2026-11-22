@@ -126,10 +126,10 @@ export function JobMatchStudio({
             )}
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
-            Job Description Alignment & Gap Engine
+            Job Match & Gap Analysis
           </h1>
           <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-            Evaluate your resume against specific job requirements. Identify missing keywords and compute skill alignment.
+            Compare your resume against any job description to discover matching skills, identify missing keywords, and get tailored recommendations.
           </p>
         </div>
 
@@ -146,10 +146,10 @@ export function JobMatchStudio({
           {onStartInterview && (
             <button
               onClick={() => onStartInterview(activeMatchId)}
-              className="flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition cursor-pointer"
+              className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition cursor-pointer"
             >
               <HelpCircle className="w-3.5 h-3.5" />
-              <span>Interview Prep Cockpit</span>
+              <span>Practice Interview</span>
             </button>
           )}
         </div>

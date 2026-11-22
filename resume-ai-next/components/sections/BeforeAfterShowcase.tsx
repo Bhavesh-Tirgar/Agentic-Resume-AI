@@ -42,10 +42,10 @@ const SHOWCASE_DATA: Record<ShowcaseIndustry, ShowcaseData> = {
       "Routine activity list without quota benchmarks or revenue scale",
       "No measurable deal velocity, contract size, or pipeline growth"
     ],
-    afterBullet: "Generated ₹3.4 Cr in net new enterprise ARR across 24 accounts, exceeding annual target quota by 138% and reducing average sales cycle from 90 to 52 days.",
+    afterBullet: "Generated $3.4M in net new enterprise ARR across 24 accounts, exceeding annual target quota by 138% and reducing average sales cycle from 90 to 52 days.",
     afterScore: 96,
     afterWins: [
-      "Explicit top-line business impact (₹3.4 Cr ARR expansion)",
+      "Explicit top-line business impact ($3.4M ARR expansion)",
       "High-signal recruiter metrics: 138% quota attainment and 42% faster cycle"
     ]
   },
@@ -58,11 +58,11 @@ const SHOWCASE_DATA: Record<ShowcaseIndustry, ShowcaseData> = {
       "Passive task summary with zero audit scope or cost efficiency metrics",
       "Lacks governance scale or executive decision-making impact"
     ],
-    afterBullet: "Directed quarterly financial reconciliation across ₹42 Cr in multi-entity corporate assets with zero discrepancies, identifying and eliminating ₹1.2 Cr in recurring vendor overhead.",
+    afterBullet: "Directed quarterly financial reconciliation across $42M in multi-entity corporate assets with zero discrepancies, identifying and eliminating $1.2M in recurring vendor overhead.",
     afterScore: 97,
     afterWins: [
-      "Asset scale defined (₹42 Cr portfolio under governance)",
-      "Quantifiable P&L contribution: ₹1.2 Cr in validated operational savings"
+      "Asset scale defined ($42M portfolio under governance)",
+      "Quantifiable P&L contribution: $1.2M in validated operational savings"
     ]
   },
   marketing: {

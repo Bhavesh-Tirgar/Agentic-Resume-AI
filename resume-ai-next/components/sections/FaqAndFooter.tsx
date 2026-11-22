@@ -81,15 +81,15 @@ export function FaqAndFooter() {
             </div>
             <span className="font-semibold text-slate-900 dark:text-white">Resume AI</span>
             <span>•</span>
-            <span className="font-mono text-[11px]">Engineering Career Copilot</span>
+            <span className="font-mono text-[11px]">AI Career Platform</span>
           </div>
 
           <div className="flex items-center gap-6 font-mono text-[11px]">
-            <a href="https://github.com/Bhavesh-Tirgar/Agentic-Resume-AI" target="_blank" rel="noreferrer" className="hover:text-slate-900 dark:hover:text-white transition">
-              GitHub Repo
+            <a href="https://github.com" target="_blank" rel="noreferrer" className="hover:text-slate-900 dark:hover:text-white transition">
+              GitHub
             </a>
             <span>•</span>
-            <span className="text-emerald-600 dark:text-emerald-400">Multi-Agent LangGraph System</span>
+            <span className="text-emerald-600 dark:text-emerald-400">Enterprise AI Engine</span>
           </div>
         </div>
       </footer>

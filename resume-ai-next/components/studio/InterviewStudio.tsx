@@ -93,11 +93,11 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId }: InterviewS
             category: q.category || "System Architecture",
             title: q.question.slice(0, 50) + "...",
             question: q.question,
-            situation: "Production incident / scale challenge requiring deterministic architecture.",
-            task: q.reason || "Architect resilient services under load.",
-            action: "Executed phased migration with stateless JWT, DRF rate limits, and LangGraph multi-agent cyclical validation.",
-            result: "Maintained 99.99% availability and neutralized 100% of adversarial injection payloads.",
-            trap: "Rookie Trap: Omitting circuit breakers or relying on untyped prompting without Pydantic validation."
+            situation: "High-priority operational challenge requiring clear leadership and execution.",
+            task: q.reason || "Deliver measurable impact under tight deadlines.",
+            action: "Structured a step-by-step resolution plan, aligned cross-functional stakeholders, and established automated quality checks.",
+            result: "Delivered project 2 weeks ahead of schedule with 99.8% quality adherence and positive client feedback.",
+            trap: "Common Mistake: Focusing solely on tasks rather than demonstrating tangible business impact and leadership."
           });
         });
       });
@@ -141,18 +141,18 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId }: InterviewS
           <div className="flex items-center gap-2">
             <HelpCircle className="w-4 h-4 text-emerald-500" />
             <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-              Technical Interview Cockpit
+              Interview Preparation
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-[#191d27] border border-slate-200 dark:border-[#272d3b] text-slate-600 dark:text-zinc-300 flex items-center gap-1">
               <Server className="w-3 h-3 text-emerald-500" />
-              <span>AI Engine Online</span>
+              <span>AI Engine Ready</span>
             </span>
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
-            STAR Framework Practice Questions
+            STAR Method Practice Questions
           </h1>
           <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-            Architectural and behavioral interview scenarios calibrated to your resume. Practice responses with verified engineering impact.
+            Practice behavioral and situational questions tailored to your experience using the proven STAR framework (Situation, Task, Action, Result).
           </p>
         </div>
 
