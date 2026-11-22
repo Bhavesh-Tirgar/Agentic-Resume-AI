@@ -21,7 +21,7 @@ export function JobScoutStudio({
   onInterviewPrep 
 }: JobScoutStudioProps) {
   const [data, setData] = useState<JobDiscoveryData>(DEMO_DISCOVERED_JOBS);
-  const [locationInput, setLocationInput] = useState("Ahmedabad, Gujarat");
+  const [locationInput, setLocationInput] = useState("Remote / Nationwide");
   const [selectedWorkType, setSelectedWorkType] = useState<"All" | "Remote" | "Hybrid" | "On-site">("All");
   const [selectedIndustry, setSelectedIndustry] = useState<string>("All Fields");
   const [isScouting, setIsScouting] = useState(false);
@@ -139,7 +139,7 @@ export function JobScoutStudio({
               type="text"
               value={locationInput}
               onChange={(e) => setLocationInput(e.target.value)}
-              placeholder="e.g. Ahmedabad, Bengaluru, London, Remote"
+              placeholder="e.g. Remote, New York, London, San Francisco"
               className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-[#272d3b] bg-slate-50 dark:bg-[#161922] text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500"
             />
             <button

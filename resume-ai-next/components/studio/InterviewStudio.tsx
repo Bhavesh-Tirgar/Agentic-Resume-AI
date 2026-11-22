@@ -23,10 +23,11 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId }: InterviewS
   const [apiNotice, setApiNotice] = useState<string | null>(null);
 
   const categories = [
-    { id: "all", label: "All Questions" },
-    { id: "Multi-Agent & System Design", label: "System Design & Agents" },
-    { id: "Security & Prompt Injection", label: "Security & Injection Defense" },
-    { id: "Backend & Database Architecture", label: "Django & Database" },
+    { id: "all", label: "All Scenarios" },
+    { id: "Leadership & Execution", label: "Leadership & Delivery" },
+    { id: "Stakeholder Management", label: "Stakeholder Alignment" },
+    { id: "Process Optimization", label: "Process & Efficiency" },
+    { id: "Crisis & Failure Recovery", label: "Crisis & Recovery" },
   ];
 
   // Auto-sync plan on mount if available
@@ -42,14 +43,14 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId }: InterviewS
           (rnd.questions || []).forEach((q: any) => {
             loaded.push({
               id: qId++,
-              category: q.category || "System Architecture",
+              category: q.category || "Strategic Delivery",
               title: q.question.slice(0, 50) + "...",
               question: q.question,
               situation: "Calibrated challenge requiring structured STAR execution.",
-              task: q.reason || "Architect resilient systems and deliver measurable outcomes.",
-              action: "Engineered scalable solutions with typed schemas, comprehensive testing, and defensive boundaries.",
-              result: "Delivered 99.9% uptime, verified schema integrity, and improved execution velocity.",
-              trap: "Rookie Trap: Giving generic answers without verifiable metrics or architectural rationale."
+              task: q.reason || "Deliver measurable outcomes and align cross-functional partners.",
+              action: "Implemented verified operational standards, established transparent communication, and governed execution.",
+              result: "Delivered 100% SLA adherence, eliminated discrepancies, and sustained customer satisfaction.",
+              trap: "Rookie Trap: Giving vague answers without verifiable metrics or strategic business rationale."
             });
           });
         });

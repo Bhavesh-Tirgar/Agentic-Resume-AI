@@ -71,8 +71,8 @@ function formatAtsData(processRes: any, fallbackName?: string): AtsResultData {
     },
     parsed_data: {
       name: backendParsed.name || fallbackName || "Verified Candidate",
-      title: backendParsed.experience?.[0]?.role || "Systems Engineer & Specialist",
-      location: backendParsed.experience?.[0]?.location || "Ahmedabad, India",
+      title: backendParsed.headline || backendParsed.experience?.[0]?.role || "Senior Solutions & Operations Specialist",
+      location: backendParsed.location || backendParsed.experience?.[0]?.location || "Remote / Hybrid",
       email: backendParsed.email || "candidate@example.com",
       linkedin: backendParsed.linkedin || "linkedin.com/in/candidate",
       github: backendParsed.github || "github.com/candidate",

@@ -293,7 +293,7 @@ export const setActiveResumeId = (id: number) => {
 // 9. Job Discovery Scout API
 export async function discoverJobsApi(
   resumeId: number,
-  location: string = "Ahmedabad, India",
+  location: string = "Remote / Nationwide",
   workType: string = "All"
 ): Promise<{
   message: string;
