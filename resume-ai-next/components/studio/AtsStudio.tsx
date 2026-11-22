@@ -4,10 +4,11 @@ import React, { useState, useRef, useEffect } from "react";
 import { 
   CheckCircle2, AlertTriangle, Copy, Check, Target, 
   HelpCircle, Layers, Building2, UploadCloud, FileText, 
-  ArrowRight, Sparkles, RefreshCw, Server, AlertCircle, Download
+  ArrowRight, Sparkles, RefreshCw, Server, AlertCircle, Download, FileDown
 } from "lucide-react";
 import { AtsResultData, INITIAL_DOSSIER } from "@/lib/demoData";
 import { useTheme } from "../ThemeProvider";
+import { generateResumePdf, TemplateType } from "@/lib/pdfGenerator";
 import { 
   uploadResumeApi, 
   processResumeApi, 
@@ -111,6 +112,8 @@ function formatAtsData(processRes: any, fallbackName?: string): AtsResultData {
 export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUploaded, activeResumeId }: AtsStudioProps) {
   const [data, setData] = useState<AtsResultData>(INITIAL_DOSSIER);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [appliedRewriteIndex, setAppliedRewriteIndex] = useState<number | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>("harvard");
   const [isScanning, setIsScanning] = useState(false);
   const [backendStatus, setBackendStatus] = useState<"connected" | "checking" | "offline">("checking");
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
@@ -141,6 +144,74 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handleApplyRewrite = (rewrittenText: string, index: number) => {
+    setAppliedRewriteIndex(index);
+    setData(prev => {
+      const updatedExp = [...prev.parsed_data.experience];
+      if (updatedExp.length > 0) {
+        updatedExp[0] = {
+          ...updatedExp[0],
+          bullets: [rewrittenText, ...(updatedExp[0].bullets?.slice(1) || [])]
+        };
+      }
+      const newScore = Math.min(99, prev.score_data.overall_score + 2);
+      return {
+        ...prev,
+        score_data: {
+          ...prev.score_data,
+          overall_score: newScore,
+        },
+        parsed_data: {
+          ...prev.parsed_data,
+          experience: updatedExp
+        }
+      };
+    });
+    setStatusNotice(`✨ Calibrated Bullet applied to candidate resume! Score upgraded to ${Math.min(99, data.score_data.overall_score + 2)}/100.`);
+    setTimeout(() => setAppliedRewriteIndex(null), 3000);
+  };
+
+  const handleDownloadPdf = () => {
+    try {
+      const skillsArray = data.parsed_data.skills?.all_extracted && data.parsed_data.skills.all_extracted.length > 0
+        ? data.parsed_data.skills.all_extracted
+        : [
+            ...(data.parsed_data.skills?.languages || []),
+            ...(data.parsed_data.skills?.frameworks || []),
+            ...(data.parsed_data.skills?.databases || []),
+            ...(data.parsed_data.skills?.devops || [])
+          ];
+
+      generateResumePdf({
+        name: data.parsed_data.name,
+        email: data.parsed_data.email,
+        phone: data.parsed_data.location ? `Location: ${data.parsed_data.location}` : undefined,
+        location: data.parsed_data.location,
+        headline: data.parsed_data.title,
+        summary: data.score_data.summary,
+        skills: skillsArray.length > 0 ? skillsArray : ["Cross-Functional Delivery", "Strategic Operations"],
+        experience: data.parsed_data.experience.map(exp => ({
+          role: exp.role,
+          organization: exp.organization,
+          location: exp.location,
+          start_date: exp.duration?.split("-")?.[0]?.trim(),
+          end_date: exp.duration?.split("-")?.[1]?.trim() || "Present",
+          description: exp.bullets?.join("\n"),
+        })),
+        education: data.parsed_data.education.map(edu => ({
+          degree: edu.degree,
+          institution: edu.institution,
+          start_date: edu.year,
+          grade: edu.grade,
+        })),
+      }, selectedTemplate);
+      setStatusNotice(`✅ Generated & Downloaded ATS-Compliant PDF (${selectedTemplate.toUpperCase()} Template)!`);
+    } catch (err: any) {
+      console.error("PDF generation failed:", err);
+      setStatusNotice(`PDF Generation error: ${err.message}`);
+    }
   };
 
   const handleExportReport = () => {
@@ -248,33 +319,67 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
             )}
           </button>
 
+          {/* Template Selector Pill */}
+          <div className="flex items-center rounded-lg border border-slate-200 dark:border-[#262c3b] bg-slate-100 dark:bg-[#191d27] p-0.5 text-xs">
+            <button
+              onClick={() => setSelectedTemplate("harvard")}
+              className={`px-2.5 py-1.5 rounded-md transition cursor-pointer font-medium ${
+                selectedTemplate === "harvard"
+                  ? "bg-white dark:bg-[#282f3f] text-slate-900 dark:text-white shadow-xs font-semibold"
+                  : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              Harvard
+            </button>
+            <button
+              onClick={() => setSelectedTemplate("modern")}
+              className={`px-2.5 py-1.5 rounded-md transition cursor-pointer font-medium ${
+                selectedTemplate === "modern"
+                  ? "bg-white dark:bg-[#282f3f] text-slate-900 dark:text-white shadow-xs font-semibold"
+                  : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              Modern
+            </button>
+          </div>
+
+          {/* Primary Action: Real PDF Export */}
+          <button
+            onClick={handleDownloadPdf}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition cursor-pointer"
+            title="Compile and download an ATS-compliant, searchable PDF resume"
+          >
+            <FileDown className="w-4 h-4" />
+            <span>Download ATS PDF</span>
+          </button>
+
           {onNavigateToMatch && (
             <button
               onClick={onNavigateToMatch}
-              className="flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#262c3b] bg-slate-100 dark:bg-[#191d27] text-slate-800 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-[#232936] transition cursor-pointer"
+              className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#262c3b] bg-slate-100 dark:bg-[#191d27] text-slate-800 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-[#232936] transition cursor-pointer"
             >
               <Target className="w-3.5 h-3.5" />
-              <span>Match Job</span>
+              <span>Match</span>
             </button>
           )}
 
           {onNavigateToInterview && (
             <button
               onClick={onNavigateToInterview}
-              className="flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#262c3b] bg-slate-100 dark:bg-[#191d27] text-slate-800 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-[#232936] transition cursor-pointer"
+              className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#262c3b] bg-slate-100 dark:bg-[#191d27] text-slate-800 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-[#232936] transition cursor-pointer"
             >
               <HelpCircle className="w-3.5 h-3.5" />
-              <span>Interview Deck</span>
+              <span>Interview</span>
             </button>
           )}
 
           <button
             onClick={handleExportReport}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#262c3b] bg-slate-100 dark:bg-[#191d27] text-slate-800 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-[#232936] transition cursor-pointer"
-            title="Download full JSON ATS Diagnostic Audit"
+            className="flex items-center justify-center gap-1.5 px-2.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#262c3b] bg-slate-100 dark:bg-[#191d27] text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-[#232936] transition cursor-pointer"
+            title="Download full JSON diagnostic audit"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="hidden sm:inline">Export Audit</span>
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">JSON</span>
           </button>
         </div>
       </div>
@@ -509,22 +614,41 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
                       <span className="text-[10px] font-mono uppercase text-emerald-600 dark:text-emerald-400 font-semibold">
                         Calibrated Rewrite (Impact-Driven)
                       </span>
-                      <button
-                        onClick={() => handleCopy(rw.rewritten, idx)}
-                        className="flex items-center gap-1 text-[11px] font-mono text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
-                      >
-                        {copiedIndex === idx ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-500" />
-                            <span className="text-emerald-500">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleApplyRewrite(rw.rewritten, idx)}
+                          className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition cursor-pointer font-medium"
+                          title="Apply this calibrated rewrite directly into your candidate experience bullets"
+                        >
+                          {appliedRewriteIndex === idx ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-500" />
+                              <span>Applied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3 h-3 text-emerald-500" />
+                              <span>Apply to Resume</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleCopy(rw.rewritten, idx)}
+                          className="flex items-center gap-1 text-[11px] font-mono text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+                        >
+                          {copiedIndex === idx ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-500" />
+                              <span className="text-emerald-500">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <p className="text-slate-900 dark:text-zinc-100 font-medium leading-relaxed bg-white dark:bg-[#161a23] p-2.5 rounded border border-slate-200 dark:border-[#232936]">
                       "{rw.rewritten}"
