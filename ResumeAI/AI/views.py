@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 
 from Resume.models import Resume
@@ -319,3 +319,84 @@ class JobDiscoveryView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class VirtualHRStartView(APIView):
+    """Initializes a new real-time interactive mock interview with Virtual HR."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        candidate_name = request.data.get("candidate_name")
+        target_role = request.data.get("target_role", "Senior Software Engineer")
+        resume_id = request.data.get("resume_id")
+        max_rounds = int(request.data.get("max_rounds", 4))
+
+        try:
+            from AI.Services.VirtualHRService import VirtualHRService
+            service = VirtualHRService()
+            result = service.start_interview(
+                candidate_name=candidate_name,
+                target_role=target_role,
+                resume_id=resume_id,
+                max_rounds=max_rounds
+            )
+            return Response(result, status=status.HTTP_201_CREATED)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class VirtualHRTurnView(APIView):
+    """Processes a candidate answer, returns STAR critique and next question."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        session_id = request.data.get("session_id")
+        candidate_answer = request.data.get("candidate_answer", "")
+
+        if not session_id:
+            return Response({"error": "session_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not candidate_answer.strip():
+            return Response({"error": "candidate_answer cannot be empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from AI.Services.VirtualHRService import VirtualHRService
+            service = VirtualHRService()
+            result = service.evaluate_turn(session_id, candidate_answer)
+            return Response(result, status=status.HTTP_200_OK)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class VirtualHRFinishView(APIView):
+    """Finalizes an interview session and compiles the candidate scorecard."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        session_id = request.data.get("session_id")
+        if not session_id:
+            return Response({"error": "session_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from AI.Services.VirtualHRService import VirtualHRService
+            service = VirtualHRService()
+            result = service.finish_interview(session_id)
+            return Response(result, status=status.HTTP_200_OK)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class VirtualHRSessionView(APIView):
+    """Retrieves current interview session state."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, session_id):
+        from AI.Services.InterviewSessionManager import session_manager
+        session = session_manager.get_session(session_id)
+        if not session:
+            return Response({"error": "Session not found or expired."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(session, status=status.HTTP_200_OK)
+

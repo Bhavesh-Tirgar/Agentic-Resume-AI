@@ -329,3 +329,108 @@ export async function getDiscoveredJobsApi(resumeId: number): Promise<any> {
 
   return res.json();
 }
+
+// 10. Virtual HR Real-Time Interactive Mock Interview APIs
+export async function startVirtualHRInterviewApi(payload: {
+  candidate_name?: string;
+  target_role?: string;
+  resume_id?: number;
+  max_rounds?: number;
+}): Promise<{
+  session_id: string;
+  candidate_name: string;
+  target_role: string;
+  current_round: number;
+  max_rounds: number;
+  greeting: string;
+  question: string;
+  category: string;
+}> {
+  const res = await fetchWithAuth("/ai/interview/live/start/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to start interview session");
+  }
+
+  return res.json();
+}
+
+export async function sendVirtualHRAnswerApi(payload: {
+  session_id: string;
+  candidate_answer: string;
+}): Promise<{
+  session_id: string;
+  round_evaluated: number;
+  next_round: number;
+  max_rounds: number;
+  is_final_round: boolean;
+  evaluation: {
+    star_score: number;
+    clarity_score: number;
+    strengths: string[];
+    critique: string;
+    hr_followup_or_next_question: string;
+    question_category: string;
+    is_final_round: boolean;
+  };
+  next_question?: string;
+}> {
+  const res = await fetchWithAuth("/ai/interview/live/turn/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to evaluate answer");
+  }
+
+  return res.json();
+}
+
+export async function finishVirtualHRInterviewApi(session_id: string): Promise<{
+  session_id: string;
+  status: string;
+  scorecard: {
+    overall_score: number;
+    verdict: string;
+    summary: string;
+    communication_score: number;
+    technical_depth_score: number;
+    problem_solving_score: number;
+    leadership_score: number;
+    top_strengths: string[];
+    critical_gaps: string[];
+    preparation_recommendations: string[];
+  };
+  turns: any[];
+}> {
+  const res = await fetchWithAuth("/ai/interview/live/finish/", {
+    method: "POST",
+    body: JSON.stringify({ session_id }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to compile interview scorecard");
+  }
+
+  return res.json();
+}
+
+export async function getVirtualHRSessionApi(session_id: string): Promise<any> {
+  const res = await fetchWithAuth(`/ai/interview/live/session/${session_id}/`, {
+    method: "GET",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to load interview session");
+  }
+
+  return res.json();
+}
+

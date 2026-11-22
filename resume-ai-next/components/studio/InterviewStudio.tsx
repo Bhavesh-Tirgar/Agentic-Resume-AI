@@ -3,17 +3,21 @@
 import React, { useState, useEffect } from "react";
 import { 
   HelpCircle, CheckCircle2, ChevronDown, ChevronUp, 
-  Copy, Check, AlertTriangle, Layers, ShieldCheck, Database, RefreshCw, Server, Download
+  Copy, Check, AlertTriangle, Layers, ShieldCheck, Database, RefreshCw, Server, Download,
+  UserCheck, Sparkles, BookOpen
 } from "lucide-react";
 import { INTERVIEW_QUESTIONS } from "@/lib/demoData";
 import { createInterviewPlanApi, getInterviewPlanApi, getActiveResumeId } from "@/lib/api";
+import { LiveMockInterview } from "./LiveMockInterview";
 
 interface InterviewStudioProps {
   activeResumeId?: number;
   activeJobMatchId?: number;
+  initialRole?: string;
 }
 
-export function InterviewStudio({ activeResumeId, activeJobMatchId }: InterviewStudioProps) {
+export function InterviewStudio({ activeResumeId, activeJobMatchId, initialRole }: InterviewStudioProps) {
+  const [activeMode, setActiveMode] = useState<"live-hr" | "question-bank">("live-hr");
   const [questions, setQuestions] = useState(INTERVIEW_QUESTIONS);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [expandedId, setExpandedId] = useState<number | null>(1);
@@ -135,79 +139,111 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId }: InterviewS
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <HelpCircle className="w-4 h-4 text-emerald-500" />
-            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-              Interview Preparation
-            </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-[#191d27] border border-slate-200 dark:border-[#272d3b] text-slate-600 dark:text-zinc-300 flex items-center gap-1">
-              <Server className="w-3 h-3 text-emerald-500" />
-              <span>AI Engine Ready</span>
-            </span>
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
-            STAR Method Practice Questions
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-            Practice behavioral and situational questions tailored to your experience using the proven STAR framework (Situation, Task, Action, Result).
-          </p>
-        </div>
+      {/* Top Mode Selector Tabs */}
+      <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-100 dark:bg-[#12151c] border border-slate-200 dark:border-[#202533] w-fit">
+        <button
+          onClick={() => setActiveMode("live-hr")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
+            activeMode === "live-hr"
+              ? "bg-white dark:bg-[#1e2330] text-slate-900 dark:text-white shadow-xs"
+              : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+          <span>Live Virtual HR Interview</span>
+        </button>
 
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
-          <button
-            onClick={handleGenerateLivePlan}
-            disabled={isGenerating}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition cursor-pointer"
-          >
-            {isGenerating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            <span>Sync with Backend</span>
-          </button>
-
-          <button
-            onClick={handleExportQuestions}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-[#272d3b] bg-white dark:bg-[#111318] text-slate-800 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-[#191d27] transition cursor-pointer"
-            title="Download questions as Markdown"
-          >
-            <Download className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="hidden sm:inline">Export Deck</span>
-          </button>
-
-          <div className="flex items-center gap-2 text-xs font-mono bg-white dark:bg-[#111318] border border-slate-200 dark:border-[#20242e] px-3 py-1.5 rounded-lg shadow-xs">
-            <span className="text-slate-500 dark:text-zinc-400">Prepared:</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{completedCount} / {questions.length}</span>
-          </div>
-        </div>
+        <button
+          onClick={() => setActiveMode("question-bank")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
+            activeMode === "question-bank"
+              ? "bg-white dark:bg-[#1e2330] text-slate-900 dark:text-white shadow-xs"
+              : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>STAR Question Bank ({questions.length})</span>
+        </button>
       </div>
 
-      {apiNotice && (
-        <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>{apiNotice}</span>
-        </div>
-      )}
+      {activeMode === "live-hr" ? (
+        <LiveMockInterview activeResumeId={activeResumeId} initialRole={initialRole} />
+      ) : (
+        <>
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-emerald-500" />
+                <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                  STAR Question Bank
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-[#191d27] border border-slate-200 dark:border-[#272d3b] text-slate-600 dark:text-zinc-300 flex items-center gap-1">
+                  <Server className="w-3 h-3 text-emerald-500" />
+                  <span>AI Engine Ready</span>
+                </span>
+              </div>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
+                STAR Method Practice Questions
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                Practice behavioral and situational questions tailored to your experience using the proven STAR framework (Situation, Task, Action, Result).
+              </p>
+            </div>
 
-      {/* Category Filter Pills */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setSelectedCategory(cat.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition cursor-pointer shrink-0 ${
-              selectedCategory === cat.id
-                ? "bg-slate-900 dark:bg-white text-white dark:text-black border-slate-900 dark:border-white shadow-sm"
-                : "bg-white dark:bg-[#111318] text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-[#20242e] hover:border-slate-300 dark:hover:border-zinc-700"
-            }`}
-          >
-            {cat.label}
-          </button>
-        ))}
-      </div>
+            <div className="flex items-center gap-2.5 self-start sm:self-auto">
+              <button
+                onClick={handleGenerateLivePlan}
+                disabled={isGenerating}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition cursor-pointer"
+              >
+                {isGenerating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                <span>Sync with Backend</span>
+              </button>
 
-      {/* Question Accordion List */}
-      <div className="space-y-4">
+              <button
+                onClick={handleExportQuestions}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-[#272d3b] bg-white dark:bg-[#111318] text-slate-800 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-[#191d27] transition cursor-pointer"
+                title="Download questions as Markdown"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="hidden sm:inline">Export Deck</span>
+              </button>
+
+              <div className="flex items-center gap-2 text-xs font-mono bg-white dark:bg-[#111318] border border-slate-200 dark:border-[#20242e] px-3 py-1.5 rounded-lg shadow-xs">
+                <span className="text-slate-500 dark:text-zinc-400">Prepared:</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{completedCount} / {questions.length}</span>
+              </div>
+            </div>
+          </div>
+
+          {apiNotice && (
+            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span>{apiNotice}</span>
+            </div>
+          )}
+
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition cursor-pointer shrink-0 ${
+                  selectedCategory === cat.id
+                    ? "bg-slate-900 dark:bg-white text-white dark:text-black border-slate-900 dark:border-white shadow-sm"
+                    : "bg-white dark:bg-[#111318] text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-[#20242e] hover:border-slate-300 dark:hover:border-zinc-700"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Question Accordion List */}
+          <div className="space-y-4">
         {filteredQuestions.map((q) => {
           const isExpanded = expandedId === q.id;
           const isDone = !!completedMap[q.id];
@@ -323,6 +359,8 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId }: InterviewS
           );
         })}
       </div>
+      </>
+      )}
     </div>
   );
 }

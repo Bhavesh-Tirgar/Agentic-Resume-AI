@@ -55,6 +55,14 @@ export default function Home() {
     handleTabChange("matcher");
   };
 
+  const handleInterviewFromScout = (job: DiscoveredJobItem) => {
+    setPrefilledJob({
+      title: job.title,
+      description: `${job.title} at ${job.company} (${job.location})`,
+    });
+    handleTabChange("interview");
+  };
+
   const scrollToScanner = () => {
     if (currentTab !== "overview") {
       setCurrentTab("overview");
@@ -174,7 +182,7 @@ export default function Home() {
               <JobScoutStudio
                 activeResumeId={activeResumeId}
                 onMatchJob={handleMatchFromScout}
-                onInterviewPrep={() => handleTabChange("interview")}
+                onInterviewPrep={handleInterviewFromScout}
               />
               <FaqAndFooter />
             </motion.div>
@@ -191,6 +199,7 @@ export default function Home() {
               <InterviewStudio
                 activeResumeId={activeResumeId}
                 activeJobMatchId={activeJobMatchId}
+                initialRole={prefilledJob?.title}
               />
               <FaqAndFooter />
             </motion.div>
