@@ -1007,9 +1007,26 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
             )}
           </div>
         </div>
-        <p className="text-sm font-medium text-slate-900 dark:text-white leading-relaxed">
-          {currentQuestion || "Preparing question..."}
-        </p>
+        {isSubmitting ? (
+          <div className="flex items-center gap-3 py-1.5 text-xs font-mono text-purple-600 dark:text-purple-400 bg-purple-500/10 p-3 rounded-xl border border-purple-500/20">
+            <div className="flex items-center gap-1">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce"
+                  style={{ animationDelay: `${i * 150}ms` }}
+                />
+              ))}
+            </div>
+            <span className="font-semibold">
+              Marcus is analyzing your STAR delivery and calibrating follow-up question...
+            </span>
+          </div>
+        ) : (
+          <p className="text-sm font-medium text-slate-900 dark:text-white leading-relaxed">
+            {currentQuestion || "Preparing question..."}
+          </p>
+        )}
       </div>
 
       {/* Latest Constructive Coaching Tip */}

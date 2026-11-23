@@ -19,6 +19,7 @@ frontend/dist/
 resume-ai-next/node_modules/
 resume-ai-next/.next/
 .vite/
+roshni-starlight/
 
 # System & Editor
 .DS_Store

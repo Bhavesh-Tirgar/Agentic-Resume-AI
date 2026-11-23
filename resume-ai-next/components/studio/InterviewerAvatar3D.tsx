@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import { Volume2, VolumeX, Sparkles, Mic, User } from "lucide-react";
+import { Volume2, VolumeX, Sparkles, Mic, User, Radio, Cpu } from "lucide-react";
 
 export type AvatarState = "idle" | "speaking" | "listening" | "thinking";
 
@@ -28,6 +28,7 @@ export function InterviewerAvatar3D({
   const mousePos = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
   const animFrameRef = useRef<number | null>(null);
   const [internalState, setInternalState] = useState<AvatarState>(state);
+  const [displayMode, setDisplayMode] = useState<"neural-orb" | "classic-mesh">("neural-orb");
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
@@ -138,6 +139,163 @@ export function InterviewerAvatar3D({
     let blinkTimer = 0;
     let isBlinking = false;
 
+    // --- Neural Quantum Orb Renderer (Luxury FAANG Mode) ---
+    const renderNeuralOrb = (
+      width: number,
+      height: number,
+      cx: number,
+      cy: number,
+      gazeX: number,
+      gazeY: number
+    ) => {
+      // 1. Chromatic Backdrop Aura
+      const auraGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, width * 0.7);
+      if (internalState === "speaking") {
+        auraGrad.addColorStop(0, "rgba(16, 185, 129, 0.35)");
+        auraGrad.addColorStop(0.4, "rgba(6, 182, 212, 0.18)");
+        auraGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+      } else if (internalState === "thinking") {
+        auraGrad.addColorStop(0, "rgba(147, 51, 234, 0.40)");
+        auraGrad.addColorStop(0.4, "rgba(79, 70, 229, 0.20)");
+        auraGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+      } else if (internalState === "listening") {
+        auraGrad.addColorStop(0, "rgba(59, 130, 246, 0.35)");
+        auraGrad.addColorStop(0.4, "rgba(99, 102, 241, 0.18)");
+        auraGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+      } else {
+        auraGrad.addColorStop(0, "rgba(52, 211, 153, 0.15)");
+        auraGrad.addColorStop(0.5, "rgba(15, 23, 42, 0.10)");
+        auraGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+      }
+      ctx.fillStyle = auraGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Perspective tilt toward mouse gaze
+      const orbCenterX = cx + gazeX * 12;
+      const orbCenterY = cy + gazeY * 8;
+
+      // 2. Ultrasonic Acoustic Shockwave Ripples
+      const waveCount = internalState === "speaking" ? 3 : internalState === "listening" ? 2 : 1;
+      for (let w = 0; w < waveCount; w++) {
+        const ringProgress = ((time * 0.7 + w * 0.33) % 1);
+        const ringRadius = 55 + ringProgress * 75;
+        const ringAlpha = (1 - ringProgress) * (internalState === "speaking" ? 0.45 : 0.25);
+        ctx.beginPath();
+        ctx.arc(orbCenterX, orbCenterY, ringRadius, 0, Math.PI * 2);
+        ctx.strokeStyle =
+          internalState === "speaking"
+            ? `rgba(16, 185, 129, ${ringAlpha})`
+            : internalState === "thinking"
+            ? `rgba(168, 85, 247, ${ringAlpha})`
+            : `rgba(56, 189, 248, ${ringAlpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // 3. 3D Gyroscopic Orbital Energy Rings
+      const ringAngles = [
+        { rot: time * 0.9, tilt: 0.5, color: internalState === "thinking" ? "#a855f7" : "#10b981", radius: 76 },
+        { rot: -time * 0.7 + 1.2, tilt: 1.1, color: internalState === "thinking" ? "#6366f1" : "#06b6d4", radius: 84 },
+        { rot: time * 1.1 + 2.4, tilt: -0.8, color: internalState === "listening" ? "#38bdf8" : "#3b82f6", radius: 72 },
+      ];
+
+      ringAngles.forEach((r, idx) => {
+        ctx.save();
+        ctx.translate(orbCenterX, orbCenterY);
+        ctx.rotate(r.rot);
+        ctx.scale(1, Math.cos(r.tilt) * 0.45 + 0.55);
+
+        ctx.beginPath();
+        ctx.arc(0, 0, r.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = r.color;
+        ctx.lineWidth = internalState === "speaking" ? 2.2 : 1.5;
+        ctx.shadowColor = r.color;
+        ctx.shadowBlur = 12;
+        ctx.globalAlpha = internalState === "speaking" ? 0.8 : 0.45;
+        ctx.stroke();
+
+        // Orbiting photon node
+        const photonAngle = time * (1.8 + idx * 0.4);
+        const px = Math.cos(photonAngle) * r.radius;
+        const py = Math.sin(photonAngle) * r.radius;
+        ctx.beginPath();
+        ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowColor = "#ffffff";
+        ctx.shadowBlur = 12;
+        ctx.fill();
+
+        ctx.restore();
+      });
+
+      // 4. Central Neural Plasma Core (Sinusoidal Fluid Waveform)
+      const baseRadius = internalState === "speaking" ? 48 + Math.sin(time * 6) * 5 : 44;
+      const numPoints = 64;
+      ctx.save();
+      ctx.beginPath();
+      for (let i = 0; i <= numPoints; i++) {
+        const theta = (i / numPoints) * Math.PI * 2;
+        const waveFreq = internalState === "speaking" ? 6 : internalState === "thinking" ? 8 : 4;
+        const waveSpeed = internalState === "thinking" ? time * 4 : time * 2.5;
+        const waveAmp = internalState === "speaking" ? 6.5 : internalState === "thinking" ? 4 : 2;
+        const r = baseRadius + Math.sin(theta * waveFreq + waveSpeed) * waveAmp;
+        const x = orbCenterX + Math.cos(theta) * r;
+        const y = orbCenterY + Math.sin(theta) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+
+      const coreGrad = ctx.createRadialGradient(
+        orbCenterX - 10,
+        orbCenterY - 10,
+        5,
+        orbCenterX,
+        orbCenterY,
+        baseRadius + 10
+      );
+
+      if (internalState === "speaking") {
+        coreGrad.addColorStop(0, "#ffffff");
+        coreGrad.addColorStop(0.25, "#34d399");
+        coreGrad.addColorStop(0.7, "#059669");
+        coreGrad.addColorStop(1, "#042f2e");
+      } else if (internalState === "thinking") {
+        coreGrad.addColorStop(0, "#ffffff");
+        coreGrad.addColorStop(0.3, "#c084fc");
+        coreGrad.addColorStop(0.7, "#7e22ce");
+        coreGrad.addColorStop(1, "#1e1b4b");
+      } else if (internalState === "listening") {
+        coreGrad.addColorStop(0, "#ffffff");
+        coreGrad.addColorStop(0.3, "#60a5fa");
+        coreGrad.addColorStop(0.7, "#2563eb");
+        coreGrad.addColorStop(1, "#0f172a");
+      } else {
+        coreGrad.addColorStop(0, "#e2e8f0");
+        coreGrad.addColorStop(0.35, "#10b981");
+        coreGrad.addColorStop(0.8, "#0f172a");
+        coreGrad.addColorStop(1, "#020617");
+      }
+
+      ctx.fillStyle = coreGrad;
+      ctx.shadowColor = internalState === "thinking" ? "#a855f7" : "#10b981";
+      ctx.shadowBlur = 24;
+      ctx.fill();
+      ctx.restore();
+
+      // 5. Specular Glint Center
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(orbCenterX - 14, orbCenterY - 14, 8, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
+      ctx.shadowColor = "#ffffff";
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.restore();
+    };
+
     const render = () => {
       time += 0.035;
 
@@ -165,6 +323,13 @@ export function InterviewerAvatar3D({
       const cx = width / 2;
       const cy = height / 2 + 10;
 
+      if (displayMode === "neural-orb") {
+        renderNeuralOrb(width, height, cx, cy - 10, gazeX, gazeY);
+        animFrameRef.current = requestAnimationFrame(render);
+        return;
+      }
+
+      // --- Classic Procedural Avatar Mesh ---
       // 1. Subtle 3D Depth Backdrop Aura
       const auraGrad = ctx.createRadialGradient(cx, cy - 20, 20, cx, cy, width * 0.65);
       if (internalState === "speaking") {
@@ -425,7 +590,7 @@ export function InterviewerAvatar3D({
         cancelAnimationFrame(animFrameRef.current);
       }
     };
-  }, [internalState]);
+  }, [internalState, displayMode]);
 
   return (
     <div className={`relative rounded-2xl overflow-hidden border border-slate-200 dark:border-[#202533] bg-gradient-to-b from-slate-900 via-[#0c0e14] to-[#07080b] shadow-xl flex flex-col items-center justify-between p-4 ${className}`}>
@@ -442,6 +607,25 @@ export function InterviewerAvatar3D({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Display Mode Toggle: Neural Orb vs Classic Mesh */}
+          <button
+            onClick={() => setDisplayMode((prev) => (prev === "neural-orb" ? "classic-mesh" : "neural-orb"))}
+            className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 backdrop-blur-md text-[10px] font-mono transition cursor-pointer border border-white/10 flex items-center gap-1"
+            title={displayMode === "neural-orb" ? "Switch to Classic Avatar" : "Switch to Neural Voice Orb"}
+          >
+            {displayMode === "neural-orb" ? (
+              <>
+                <Sparkles className="w-3 h-3 text-emerald-400" />
+                <span>Neural Orb</span>
+              </>
+            ) : (
+              <>
+                <User className="w-3 h-3 text-blue-400" />
+                <span>Classic</span>
+              </>
+            )}
+          </button>
+
           {/* Dynamic State Badge */}
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-md border transition-all ${
             internalState === "speaking"
