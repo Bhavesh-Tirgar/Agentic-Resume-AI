@@ -231,10 +231,17 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
                   saccadeSweepCounterRef.current++;
                   lastXDeltaSignRef.current = currentSign;
                 }
-                if (saccadeSweepCounterRef.current > 6) {
+                if (saccadeSweepCounterRef.current > 18) {
                   isReading = true;
                   calculatedDemeanor = "Reading Prepared Script";
                   calculatedGaze = "Reading Off-Screen Text";
+                }
+
+                // Gradual decay: reduce counter by 2 every ~3 seconds so brief glances don't lock in the flag
+                const nowSec = Math.floor(Date.now() / 3000);
+                if (!saccadeSweepCounterRef._lastDecaySec || saccadeSweepCounterRef._lastDecaySec !== nowSec) {
+                  saccadeSweepCounterRef._lastDecaySec = nowSec;
+                  saccadeSweepCounterRef.current = Math.max(0, saccadeSweepCounterRef.current - 2);
                 }
               }
               prevCentroidRef.current = { x: centroidX, y: centroidY };

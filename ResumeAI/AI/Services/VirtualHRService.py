@@ -131,9 +131,14 @@ class VirtualHRService:
 
         # Build concise dialogue history summary
         history_lines = []
-        for t in session.get("turns", []):
+        for idx, t in enumerate(session.get("turns", []), start=1):
             if t.get("answer"):
-                history_lines.append(f"Q: {t.get('question')}\nA: {t.get('answer')[:150]}...")
+                ev = t.get("evaluation") or {}
+                history_lines.append(
+                    f"[Round {idx}] Q: {t.get('question', '')[:200]}\n"
+                    f"Candidate Answer: {t.get('answer', '')[:400]}\n"
+                    f"STAR Score: {ev.get('star_score', 'N/A')}/100 | Critique: {ev.get('critique', '')[:120]}"
+                )
         history_summary = "\n".join(history_lines) if history_lines else "No prior answers yet."
 
         # Candidate summary from resume or dynamic session context

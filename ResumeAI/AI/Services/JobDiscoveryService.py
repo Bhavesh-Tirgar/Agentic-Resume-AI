@@ -1,5 +1,7 @@
 import re
+import os
 import logging
+import requests
 from urllib.parse import quote_plus
 from django.db import transaction
 from Resume.models import Resume
@@ -9,6 +11,121 @@ from AI.Schemas.JobDiscoverySchema import JobDiscoveryResponseSchema, Discovered
 from AI.Agents.JobDiscoveryAgent import JobDiscoveryAgent
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Real Job API Integration — Adzuna
+# ---------------------------------------------------------------------------
+
+def fetch_real_jobs_from_adzuna(
+    role: str,
+    skills: list,
+    location: str,
+    work_type: str = "All",
+    results_per_page: int = 8,
+) -> list[dict]:
+    """
+    Fetches real live job listings from the Adzuna API.
+    Returns raw result dicts from the API, or [] if unavailable.
+    Requires ADZUNA_APP_ID and ADZUNA_APP_KEY in environment.
+    Free tier: 250 req/day — register at https://developer.adzuna.com/
+    """
+    app_id = os.getenv("ADZUNA_APP_ID", "").strip()
+    app_key = os.getenv("ADZUNA_APP_KEY", "").strip()
+    if not app_id or not app_key:
+        logger.info("Adzuna API keys not configured — skipping real job fetch.")
+        return []
+
+    # Country routing: default to India (in); detect US/UK from location string
+    loc_lower = location.lower()
+    if any(k in loc_lower for k in ["usa", "united states", "new york", "san francisco", "seattle", "chicago"]):
+        country = "us"
+    elif any(k in loc_lower for k in ["uk", "london", "manchester", "united kingdom", "england"]):
+        country = "gb"
+    elif any(k in loc_lower for k in ["canada", "toronto", "vancouver"]):
+        country = "ca"
+    elif any(k in loc_lower for k in ["australia", "sydney", "melbourne"]):
+        country = "au"
+    else:
+        country = "in"  # India default
+
+    query_parts = [role] + skills[:2]
+    if work_type == "Remote":
+        query_parts.append("remote")
+
+    url = f"https://api.adzuna.com/v1/api/jobs/{country}/search/1"
+    params = {
+        "app_id": app_id,
+        "app_key": app_key,
+        "what": " ".join(query_parts),
+        "where": location if country != "in" else "",
+        "results_per_page": results_per_page,
+        "sort_by": "relevance",
+        "content-type": "application/json",
+    }
+    # Clean empty params
+    params = {k: v for k, v in params.items() if v != ""}
+
+    try:
+        resp = requests.get(url, params=params, timeout=8)
+        resp.raise_for_status()
+        results = resp.json().get("results", [])
+        logger.info("Adzuna returned %d jobs for query '%s'", len(results), " ".join(query_parts))
+        return results
+    except Exception as exc:
+        logger.warning("Adzuna API call failed (%s) — will use grounded fallback.", exc)
+        return []
+
+
+def map_adzuna_to_discovered_job(raw: dict, candidate_skills: list) -> DiscoveredJob:
+    """Maps a single Adzuna result dict to our DiscoveredJob schema."""
+    title = raw.get("title", "Software Engineer")
+    company = raw.get("company", {}).get("display_name", "Company")
+    location_obj = raw.get("location", {})
+    location_str = ", ".join(location_obj.get("area", [])) or raw.get("location", {}).get("display_name", "Remote")
+    salary_min = raw.get("salary_min")
+    salary_max = raw.get("salary_max")
+    if salary_min and salary_max:
+        salary_range = f"₹{int(salary_min):,} – ₹{int(salary_max):,} / yr"
+    elif salary_min:
+        salary_range = f"₹{int(salary_min):,}+ / yr"
+    else:
+        salary_range = "Competitive"
+
+    description = raw.get("description", "")[:300]
+    redirect_url = raw.get("redirect_url", "")
+
+    # Simple skill match from description
+    desc_lower = (description + " " + title).lower()
+    matched = [s for s in candidate_skills if s.lower() in desc_lower]
+    match_pct = min(95, 60 + len(matched) * 8)
+
+    contract_type = raw.get("contract_type") or ""
+    if "remote" in desc_lower:
+        work_type = "Remote"
+    elif "hybrid" in desc_lower:
+        work_type = "Hybrid"
+    elif contract_type:
+        work_type = contract_type.capitalize()
+    else:
+        work_type = "On-site"
+
+    return DiscoveredJob(
+        id=str(raw.get("id", "")),
+        title=title,
+        company=company,
+        location=location_str,
+        work_type=work_type,
+        distance_commute="Within city area",
+        match_percentage=match_pct,
+        salary_range=salary_range,
+        experience_required=raw.get("category", {}).get("label", "Mid-level"),
+        matched_skills=matched[:5],
+        missing_skills=[],
+        description_snippet=description,
+        apply_url=redirect_url,
+        match_rationale=f"Real live listing from Adzuna matching your {title} search.",
+    )
 
 
 def detect_candidate_domain(resume_schema: ResumeSchema) -> str:
@@ -253,21 +370,39 @@ class JobDiscoveryService:
             if candidate_loc and candidate_loc.strip() and candidate_loc.lower() not in ["hybrid", "remote"]:
                 effective_location = candidate_loc
 
-        # Run AI Agent with grounded fallback
-        try:
-            agent = JobDiscoveryAgent()
-            discovery_result = agent.run(
-                resume=resume_schema,
-                location=effective_location,
-                work_type=work_type
+        # ---- Path 1: Real jobs from Adzuna API (live listings) ----
+        target_role = resume_schema.experience[0].role if resume_schema.experience else "Professional"
+        raw_jobs = fetch_real_jobs_from_adzuna(
+            role=target_role,
+            skills=resume_schema.skills or [],
+            location=effective_location,
+            work_type=work_type,
+        )
+
+        if raw_jobs:
+            jobs = [map_adzuna_to_discovered_job(r, resume_schema.skills or []) for r in raw_jobs]
+            discovery_result = JobDiscoveryResponseSchema(
+                candidate_location=effective_location,
+                total_jobs_found=len(jobs),
+                jobs=jobs,
+                search_summary=f"Found {len(jobs)} real live listings from Adzuna matching your profile in {effective_location}.",
             )
-        except Exception as exc:
-            logger.warning("Gemini Job Discovery issue (%s). Using grounded proximity matcher.", exc)
-            discovery_result = build_grounded_job_discovery(
-                resume_schema=resume_schema,
-                location=effective_location,
-                work_type=work_type
-            )
+        else:
+            # ---- Path 2: Gemini AI Agent (grounded hallucination, better than nothing) ----
+            try:
+                agent = JobDiscoveryAgent()
+                discovery_result = agent.run(
+                    resume=resume_schema,
+                    location=effective_location,
+                    work_type=work_type,
+                )
+            except Exception as exc:
+                logger.warning("Gemini Job Discovery issue (%s). Using grounded proximity matcher.", exc)
+                discovery_result = build_grounded_job_discovery(
+                    resume_schema=resume_schema,
+                    location=effective_location,
+                    work_type=work_type,
+                )
 
         saved = JobDiscoveryResult.objects.create(
             resume=resume,
