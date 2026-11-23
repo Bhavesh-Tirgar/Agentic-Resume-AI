@@ -77,7 +77,8 @@ class VirtualHRService:
         except Exception as e:
             logger.warning("Could not synthesize opening voice: %s", e)
 
-        # Store initial question in session state
+        # Store initial question and candidate summary in session state
+        session["candidate_summary"] = candidate_summary
         session["current_question"] = first_question
         session["turns"].append({
             "round": 1,
@@ -135,8 +136,13 @@ class VirtualHRService:
                 history_lines.append(f"Q: {t.get('question')}\nA: {t.get('answer')[:150]}...")
         history_summary = "\n".join(history_lines) if history_lines else "No prior answers yet."
 
-        # Candidate summary from resume if available
-        candidate_summary = f"Applying for {target_role}"
+        # Candidate summary from resume or dynamic session context
+        candidate_summary = session.get("candidate_summary") or f"Applying for {target_role}"
+        ans_lower = candidate_answer.lower()
+        if any(w in ans_lower for w in ["fresher", "intern", "college", "student", "beginner", "just graduated", "final year", "3rd year", "4th year"]):
+            candidate_summary += " | SENIORITY: Junior / Fresher / Student. Calibrate questions to fundamentals, core algorithms, and personal projects. Be conversational, supportive, and provide hints if they get stuck."
+        elif any(w in ans_lower for w in ["senior", "lead", "architect", "principal", "staff", "10 years", "8 years", "7 years"]):
+            candidate_summary += " | SENIORITY: Senior / Staff / Architect. Calibrate questions to distributed systems, scalability, trade-offs, and failure scenarios."
 
         prompt_text = VIRTUAL_HR_EVALUATION_PROMPT.format(
             candidate_name=candidate_name,
@@ -351,13 +357,21 @@ class VirtualHRService:
                 vision=vision_metrics
             )
 
-        # Case 4: Normal Technical Answer
+        # Case 4: Normal Technical Answer (Dynamically Calibrated to Seniority)
         has_metrics = any(char.isdigit() for char in answer)
         star_score = min(92, max(60, 65 + (15 if has_metrics else 0) + (10 if word_count > 40 else 0)))
         clarity_score = 85 if word_count >= 30 else 70
+        is_junior = any(k in ans_lower for k in ["fresher", "intern", "college", "student", "beginner", "just graduated", "final year", "3rd year", "4th year"])
 
         if is_camera_off:
             next_q = "Got it, that makes sense. By the way, if you can turn your camera on, it helps a lot to see each other. Tell me about a time when you faced a difficult technical bottleneck on that project?"
+        elif is_junior:
+            if current_round == 2:
+                next_q = "That's a great project to build! When you were writing the code, what was one bug or error that really stumped you, and how did you figure out how to fix it?"
+            elif current_round == 3:
+                next_q = "Debugging is where real learning happens. When you work on projects with classmates, how do you handle dividing tasks or resolving disagreements on how to build it?"
+            else:
+                next_q = "Looking back at that project, what's one new technology or concept you're most excited to learn next in your engineering career?"
         elif current_round == 2:
             next_q = "Nice, that's really cool. When you built that, what was the biggest technical challenge or bottleneck you ran into, and how did you resolve it?"
         elif current_round == 3:
