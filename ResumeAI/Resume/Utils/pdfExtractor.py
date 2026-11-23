@@ -1,4 +1,7 @@
-import fitz
+import logging
+import pymupdf
+
+logger = logging.getLogger(__name__)
 
 OCR_THRESHOLD = 100
 
@@ -6,10 +9,10 @@ OCR_THRESHOLD = 100
 def extract_text_from_pdf(pdf_path: str) -> str:
     """
     Extract text from a PDF document.
-    1. Fast native text extraction via PyMuPDF (fitz).
+    1. Fast native text extraction via PyMuPDF.
     2. Lazy fallback to OCR if document contains primarily scanned images.
     """
-    document = fitz.open(pdf_path)
+    document = pymupdf.open(pdf_path)
 
     try:
         text = ""
@@ -24,11 +27,11 @@ def extract_text_from_pdf(pdf_path: str) -> str:
     if len(text) < OCR_THRESHOLD:
         try:
             from .ocrService import OCRService
-            print("Using OCR fallback...")
+            logger.info("Native text extraction sparse (<%d chars). Initiating OCR fallback.", OCR_THRESHOLD)
             ocr_text = OCRService.extract_text(pdf_path)
             if ocr_text and ocr_text.strip():
                 return ocr_text
         except Exception as e:
-            print(f"OCR unavailable or encountered an error: {e}")
+            logger.warning("OCR unavailable or encountered an error: %s", e)
 
     return text

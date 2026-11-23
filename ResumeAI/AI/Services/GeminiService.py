@@ -15,7 +15,7 @@ class GeminiService:
 
     def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY")
-        model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+        model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
         if not api_key:
             raise ValueError("GEMINI_API_KEY not found in .env")

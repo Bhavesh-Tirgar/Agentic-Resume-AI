@@ -14,8 +14,60 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Real Job API Integration — Adzuna
+# Real Job API Integration — Adzuna & Global Geo-Routing
 # ---------------------------------------------------------------------------
+
+CURRENCY_MAP = {
+    "us": "$",
+    "ca": "CA$",
+    "au": "A$",
+    "gb": "£",
+    "de": "€",
+    "fr": "€",
+    "nl": "€",
+    "it": "€",
+    "es": "€",
+    "pl": "PLN ",
+    "br": "R$",
+    "za": "R",
+    "sg": "S$",
+    "in": "₹",
+}
+
+
+def resolve_country_code(location: str) -> str:
+    """Accurately maps candidate location queries to supported Adzuna national job markets."""
+    if not location:
+        return "in"
+    loc = location.lower()
+    if any(k in loc for k in ["usa", "united states", "new york", "san francisco", "seattle", "chicago", "austin", "boston", "california", "texas"]):
+        return "us"
+    if any(k in loc for k in ["uk", "london", "manchester", "united kingdom", "england", "scotland", "edinburgh"]):
+        return "gb"
+    if any(k in loc for k in ["germany", "deutschland", "berlin", "munich", "münchen", "frankfurt", "hamburg"]):
+        return "de"
+    if any(k in loc for k in ["france", "paris", "lyon", "marseille"]):
+        return "fr"
+    if any(k in loc for k in ["netherlands", "amsterdam", "rotterdam", "utrecht"]):
+        return "nl"
+    if any(k in loc for k in ["canada", "toronto", "vancouver", "montreal", "ottawa"]):
+        return "ca"
+    if any(k in loc for k in ["australia", "sydney", "melbourne", "brisbane"]):
+        return "au"
+    if any(k in loc for k in ["poland", "warsaw", "krakow", "wroclaw"]):
+        return "pl"
+    if any(k in loc for k in ["italy", "rome", "milan", "milano"]):
+        return "it"
+    if any(k in loc for k in ["spain", "madrid", "barcelona", "valencia"]):
+        return "es"
+    if any(k in loc for k in ["singapore"]):
+        return "sg"
+    if any(k in loc for k in ["south africa", "cape town", "johannesburg"]):
+        return "za"
+    if any(k in loc for k in ["brazil", "sao paulo", "rio"]):
+        return "br"
+    return "in"
+
 
 def fetch_real_jobs_from_adzuna(
     role: str,
@@ -36,18 +88,7 @@ def fetch_real_jobs_from_adzuna(
         logger.info("Adzuna API keys not configured — skipping real job fetch.")
         return []
 
-    # Country routing: default to India (in); detect US/UK from location string
-    loc_lower = location.lower()
-    if any(k in loc_lower for k in ["usa", "united states", "new york", "san francisco", "seattle", "chicago"]):
-        country = "us"
-    elif any(k in loc_lower for k in ["uk", "london", "manchester", "united kingdom", "england"]):
-        country = "gb"
-    elif any(k in loc_lower for k in ["canada", "toronto", "vancouver"]):
-        country = "ca"
-    elif any(k in loc_lower for k in ["australia", "sydney", "melbourne"]):
-        country = "au"
-    else:
-        country = "in"  # India default
+    country = resolve_country_code(location)
 
     query_parts = [role] + skills[:2]
     if work_type == "Remote":
@@ -70,25 +111,27 @@ def fetch_real_jobs_from_adzuna(
         resp = requests.get(url, params=params, timeout=8)
         resp.raise_for_status()
         results = resp.json().get("results", [])
-        logger.info("Adzuna returned %d jobs for query '%s'", len(results), " ".join(query_parts))
+        logger.info("Adzuna returned %d jobs for query '%s' in country %s", len(results), " ".join(query_parts), country)
         return results
     except Exception as exc:
         logger.warning("Adzuna API call failed (%s) — will use grounded fallback.", exc)
         return []
 
 
-def map_adzuna_to_discovered_job(raw: dict, candidate_skills: list) -> DiscoveredJob:
-    """Maps a single Adzuna result dict to our DiscoveredJob schema."""
+def map_adzuna_to_discovered_job(raw: dict, candidate_skills: list, country: str = "in") -> DiscoveredJob:
+    """Maps a single Adzuna result dict to our DiscoveredJob schema with calibrated international currency."""
     title = raw.get("title", "Software Engineer")
     company = raw.get("company", {}).get("display_name", "Company")
     location_obj = raw.get("location", {})
     location_str = ", ".join(location_obj.get("area", [])) or raw.get("location", {}).get("display_name", "Remote")
     salary_min = raw.get("salary_min")
     salary_max = raw.get("salary_max")
+    
+    currency_symbol = CURRENCY_MAP.get(country, "$")
     if salary_min and salary_max:
-        salary_range = f"₹{int(salary_min):,} – ₹{int(salary_max):,} / yr"
+        salary_range = f"{currency_symbol}{int(salary_min):,} – {currency_symbol}{int(salary_max):,} / yr"
     elif salary_min:
-        salary_range = f"₹{int(salary_min):,}+ / yr"
+        salary_range = f"{currency_symbol}{int(salary_min):,}+ / yr"
     else:
         salary_range = "Competitive"
 
@@ -380,7 +423,8 @@ class JobDiscoveryService:
         )
 
         if raw_jobs:
-            jobs = [map_adzuna_to_discovered_job(r, resume_schema.skills or []) for r in raw_jobs]
+            target_country = resolve_country_code(effective_location)
+            jobs = [map_adzuna_to_discovered_job(r, resume_schema.skills or [], country=target_country) for r in raw_jobs]
             discovery_result = JobDiscoveryResponseSchema(
                 candidate_location=effective_location,
                 total_jobs_found=len(jobs),
