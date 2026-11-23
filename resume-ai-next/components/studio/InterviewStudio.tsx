@@ -4,11 +4,12 @@ import React, { useState, useEffect } from "react";
 import { 
   HelpCircle, CheckCircle2, ChevronDown, ChevronUp, 
   Copy, Check, AlertTriangle, Layers, ShieldCheck, Database, RefreshCw, Server, Download,
-  UserCheck, Sparkles, BookOpen
+  UserCheck, Sparkles, BookOpen, Clock
 } from "lucide-react";
 import { INTERVIEW_QUESTIONS } from "@/lib/demoData";
 import { createInterviewPlanApi, getInterviewPlanApi, getActiveResumeId } from "@/lib/api";
 import { ThreeDLiveMockInterview } from "./ThreeDLiveMockInterview";
+import { InterviewHistoryView } from "./InterviewHistoryView";
 
 interface InterviewStudioProps {
   activeResumeId?: number;
@@ -17,7 +18,7 @@ interface InterviewStudioProps {
 }
 
 export function InterviewStudio({ activeResumeId, activeJobMatchId, initialRole }: InterviewStudioProps) {
-  const [activeMode, setActiveMode] = useState<"live-hr" | "question-bank">("live-hr");
+  const [activeMode, setActiveMode] = useState<"live-hr" | "question-bank" | "history">("live-hr");
   const [questions, setQuestions] = useState(INTERVIEW_QUESTIONS);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [expandedId, setExpandedId] = useState<number | null>(1);
@@ -165,10 +166,24 @@ export function InterviewStudio({ activeResumeId, activeJobMatchId, initialRole 
           <BookOpen className="w-3.5 h-3.5" />
           <span>STAR Question Bank ({questions.length})</span>
         </button>
+
+        <button
+          onClick={() => setActiveMode("history")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
+            activeMode === "history"
+              ? "bg-white dark:bg-[#1e2330] text-slate-900 dark:text-white shadow-xs"
+              : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5 text-blue-500" />
+          <span>Past Sessions & History</span>
+        </button>
       </div>
 
       {activeMode === "live-hr" ? (
         <ThreeDLiveMockInterview activeResumeId={activeResumeId} initialRole={initialRole} />
+      ) : activeMode === "history" ? (
+        <InterviewHistoryView onStartNew={() => setActiveMode("live-hr")} />
       ) : (
         <>
           {/* Header */}

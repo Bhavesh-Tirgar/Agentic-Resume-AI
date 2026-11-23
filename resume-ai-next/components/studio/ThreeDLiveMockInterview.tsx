@@ -71,6 +71,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
   // Scorecard
   const [scorecard, setScorecard] = useState<any | null>(null);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Camera HUD reference
   const cameraRef = useRef<CameraFeedHUDRef>(null);
@@ -282,7 +283,10 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       }
     } catch (err: any) {
       setAvatarState("idle");
-      alert("Error submitting answer: " + (err.message || "Unknown error"));
+      const msg = err?.message?.includes("Failed to fetch") || err?.message?.includes("NetworkError")
+        ? "Cannot reach backend server. Please ensure Django is running on port 8000."
+        : (err?.message || "Error submitting answer. Please try again.");
+      setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -434,7 +438,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         setRecordingSeconds((prev) => prev + 1);
       }, 1000);
     } catch (err: any) {
-      alert("Microphone access denied or not available. Please allow mic permissions in your browser or type your answer below.");
+      setErrorMessage("Microphone access denied or not available. Please allow mic permissions in your browser or type your answer below.");
     }
   };
 
@@ -483,7 +487,10 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         }
       }
     } catch (err: any) {
-      alert("Failed to start mock interview: " + (err.message || "Unknown error"));
+      const msg = err?.message?.includes("Failed to fetch") || err?.message?.includes("NetworkError")
+        ? "Could not connect to AI Interviewer. Make sure the backend server is running on port 8000."
+        : (err?.message || "Failed to start mock interview. Please try again.");
+      setErrorMessage(msg);
     } finally {
       setIsStarting(false);
     }
@@ -514,7 +521,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       onFinish?.(res.scorecard);
       setTextToSpeak(null);
     } catch (err: any) {
-      alert("Error generating scorecard: " + (err.message || "Unknown error"));
+      setErrorMessage("Error generating scorecard: " + (err.message || "Unknown error"));
     } finally {
       setIsFinishing(false);
     }
@@ -587,6 +594,22 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
             </p>
           </div>
         </div>
+
+        {/* Dismissible Error Banner */}
+        {errorMessage && (
+          <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-medium">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="text-red-500 hover:text-red-400 font-bold px-1.5 py-0.5 rounded cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Inputs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -828,6 +851,22 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
   // 3. Active 3D Interview Stage
   return (
     <div className="w-full max-w-5xl mx-auto space-y-5">
+      {/* Dismissible Error Banner */}
+      {errorMessage && (
+        <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-medium shadow-md">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="text-red-500 hover:text-red-400 font-bold px-1.5 py-0.5 rounded cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Top Control Bar with 5-Minute Timer */}
       <div className="rounded-2xl border border-slate-200 dark:border-[#202533] bg-white/80 dark:bg-[#111318]/90 backdrop-blur-md p-4 shadow-lg flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">

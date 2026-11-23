@@ -481,3 +481,32 @@ export async function getVirtualHRSessionApi(session_id: string): Promise<any> {
   return res.json();
 }
 
+export async function getVirtualHRHistoryApi(): Promise<{
+  total_records: number;
+  history: Array<{
+    id: number;
+    session_id: string;
+    candidate_name: string;
+    target_role: string;
+    verdict: string;
+    overall_score: number;
+    summary: string;
+    top_strengths: string[];
+    critical_gaps: string[];
+    preparation_recommendations: string[];
+    turns_count: number;
+    created_at: string;
+  }>;
+}> {
+  const res = await fetchWithAuth("/ai/interview/live/history/", {
+    method: "GET",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to load interview history");
+  }
+
+  return res.json();
+}
+
+
