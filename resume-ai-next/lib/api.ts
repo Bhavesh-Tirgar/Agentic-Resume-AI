@@ -23,16 +23,41 @@ export const removeAuthToken = () => {
 };
 
 /**
+ * Retrieves or generates an isolated anonymous guest identity for the current browser session.
+ * Eliminates cross-user collision on shared accounts while maintaining seamless guest onboarding.
+ */
+function getOrGenerateGuestCredentials(): { username: string; password: string } {
+  if (typeof window === "undefined") {
+    return { username: "guest_server_default", password: "Password123!" };
+  }
+
+  const stored = localStorage.getItem("resume_ai_guest_creds");
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed.username && parsed.password) {
+        return parsed;
+      }
+    } catch {}
+  }
+
+  const uniqueId = Math.random().toString(36).substring(2, 10);
+  const creds = {
+    username: `guest_${uniqueId}`,
+    password: `SecGuest_${uniqueId}_${Math.random().toString(36).substring(2, 7)}!`,
+  };
+  localStorage.setItem("resume_ai_guest_creds", JSON.stringify(creds));
+  return creds;
+}
+
+/**
  * Logs in or registers guest session to acquire fresh JWT token
  */
 async function acquireFreshToken(): Promise<string> {
-  const guestUser = {
-    username: "guest_architect",
-    password: "Password123!",
-  };
+  const guestUser = getOrGenerateGuestCredentials();
 
   try {
-    // 1. Try login
+    // 1. Try login with dynamic credentials
     const res = await fetch(`${API_BASE}/auth/token/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -47,24 +72,29 @@ async function acquireFreshToken(): Promise<string> {
       }
     }
 
-    // 2. If login failed, register and login
-    await fetch(`${API_BASE}/auth/register/`, {
+    // 2. If login failed (first time for this browser), register then login
+    const regRes = await fetch(`${API_BASE}/auth/register/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...guestUser, email: "guest@resumeai.internal" }),
+      body: JSON.stringify({ 
+        ...guestUser, 
+        email: `${guestUser.username}@resumeai.internal` 
+      }),
     });
 
-    const retry = await fetch(`${API_BASE}/auth/token/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(guestUser),
-    });
+    if (regRes.ok || regRes.status === 400) {
+      const retry = await fetch(`${API_BASE}/auth/token/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(guestUser),
+      });
 
-    if (retry.ok) {
-      const data = await retry.json();
-      if (data.access) {
-        setAuthToken(data.access);
-        return data.access;
+      if (retry.ok) {
+        const data = await retry.json();
+        if (data.access) {
+          setAuthToken(data.access);
+          return data.access;
+        }
       }
     }
   } catch (err) {
