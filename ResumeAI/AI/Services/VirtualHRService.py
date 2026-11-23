@@ -189,7 +189,8 @@ class VirtualHRService:
         session["turns"] = turns
         session_manager.save_session(session_id, session)
 
-        spoken_dialogue = eval_result.hr_followup_or_next_question or eval_result.critique
+        next_q = eval_result.hr_followup_or_next_question if not is_finished else None
+        spoken_dialogue = next_q or eval_result.critique
         audio_b64 = None
         if spoken_dialogue:
             try:

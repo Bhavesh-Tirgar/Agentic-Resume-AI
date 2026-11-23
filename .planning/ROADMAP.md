@@ -47,3 +47,11 @@ Upgrade `Bhavesh-Tirgar/Agentic-Resume-AI` from a prototype into a high-performa
 - [x] M6.5: Self-healing authentication (`fetchWithAuth`) with automatic 401 eviction, silent token renegotiation, and extended 30-day JWT lifetime.
 - [x] M6.6: Zero-500 fallback engines (`build_heuristic_job_discovery`, `build_heuristic_interview_plan`, calibrated parsers) resilient against Google Gemini 429 quota exhaustion.
 - [x] M6.7: Comprehensive test expansion: 15/15 unit and integration tests passing (100% green).
+
+---
+
+### Phase 7: Project J.A.R.V.I.S. — Sub-Second Full-Duplex Multimodal Interviewer (v3.0)
+- [ ] M7.1: **Sub-Second Streaming Audio & Barge-In:** Fast bidirectional WebSocket endpoint (`/ws/interview/live/`), client-side Silero VAD, streaming chunked speech synthesis, instant interruption handling.
+- [ ] M7.2: **Client-Side MediaPipe Vision Telemetry (30 FPS):** Embed `@mediapipe/tasks-vision` Wasm in Next.js; calculate 3D Iris Gaze Vector, Eye Aspect Ratio (EAR), head pose (Yaw/Pitch/Roll), and rapid saccade reading detection.
+- [ ] M7.3: **Audio-to-Viseme 3D Avatar Lip-Sync:** 16-band audio FFT to 52 ARKit blendshapes (`jawOpen`, `mouthPucker`, `mouthFunnel`, `browInnerUp`) with procedural micro-blinks and attentive head nods.
+- [ ] M7.4: **Distributed State & Enterprise Persistence:** Replace in-memory `InterviewSessionManager` with Redis cluster state + PostgreSQL audit event logging; Docker Compose orchestration.
