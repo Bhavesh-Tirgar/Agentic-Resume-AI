@@ -67,8 +67,8 @@ class CandidateVisionService:
     ) -> VisionTelemetry:
         """
         Synthesizes client telemetry and webcam snapshot into a verified VisionTelemetry model.
-        Prioritizes true multimodal vision analysis when snapshot is available.
-        Correctly recognizes when camera is turned OFF.
+        Prioritizes sub-millisecond client telemetry to eliminate 3.5s multimodal API latency.
+        Falls back to multimodal vision only when client telemetry is absent.
         """
         client_telemetry = client_telemetry or {}
 
@@ -87,37 +87,33 @@ class CandidateVisionService:
                 facial_demeanor="Camera Off"
             )
 
-        # 2. Try multimodal vision inference on the snapshot if provided
+        # 2. Fast-Path: Prioritize sub-millisecond client telemetry (<1ms latency)
+        if client_telemetry and client_telemetry.get("camera_active", False):
+            eye_contact = int(client_telemetry.get("eye_contact_percentage", 75))
+            confidence = int(client_telemetry.get("confidence_score", 70))
+            nervousness = int(client_telemetry.get("nervousness_score", 25))
+            gaze = client_telemetry.get("gaze_direction", "Direct / Focused")
+            demeanor = client_telemetry.get("facial_demeanor", "Composed")
+
+            return VisionTelemetry(
+                eye_contact_percentage=max(0, min(100, eye_contact)),
+                confidence_score=max(0, min(100, confidence)),
+                nervousness_score=max(0, min(100, nervousness)),
+                gaze_direction=gaze,
+                facial_demeanor=demeanor
+            )
+
+        # 3. Fallback: Run multimodal vision inference on the snapshot only if client telemetry was missing
         if snapshot_base64:
             vision_result = cls.analyze_snapshot_with_vision(snapshot_base64)
             if vision_result:
                 return vision_result
 
-        # 3. Fallback to calibrated telemetry heuristics
-        eye_contact = int(client_telemetry.get("eye_contact_percentage", 75))
-        confidence = int(client_telemetry.get("confidence_score", 70))
-        nervousness = int(client_telemetry.get("nervousness_score", 25))
-        gaze = client_telemetry.get("gaze_direction", "Direct / Focused")
-        demeanor = client_telemetry.get("facial_demeanor", "Composed")
-
-        # Clamp metrics to 0-100
-        eye_contact = max(0, min(100, eye_contact))
-        confidence = max(0, min(100, confidence))
-        nervousness = max(0, min(100, nervousness))
-
-        # Adjust demeanor based on detected nervousness/confidence
-        if nervousness > 60:
-            demeanor = "Tense / Anxious"
-        elif confidence > 80 and nervousness < 30:
-            demeanor = "Confident & Composed"
-        elif eye_contact < 40:
-            demeanor = "Distracted / Looking Down"
-            gaze = "Looking Down"
-
+        # 4. Baseline default
         return VisionTelemetry(
-            eye_contact_percentage=eye_contact,
-            confidence_score=confidence,
-            nervousness_score=nervousness,
-            gaze_direction=gaze,
-            facial_demeanor=demeanor
+            eye_contact_percentage=75,
+            confidence_score=70,
+            nervousness_score=20,
+            gaze_direction="Direct / Focused",
+            facial_demeanor="Confident & Composed"
         )

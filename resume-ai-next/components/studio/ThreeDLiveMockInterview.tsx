@@ -146,6 +146,8 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
   const animFrameRef = useRef<number | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasSpokenRef = useRef(false);
+  const speechRecognitionRef = useRef<any>(null);
+  const liveTranscriptRef = useRef<string>("");
 
   // 5-Minute Timer Countdown Loop
   useEffect(() => {
@@ -308,6 +310,12 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
     }
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch (e) {}
+      speechRecognitionRef.current = null;
+    }
 
     const recorder = mediaRecorderRef.current;
 
@@ -334,7 +342,11 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       reader.readAsDataURL(audioBlob);
       reader.onloadend = async () => {
         const base64Audio = reader.result as string;
-        await dispatchTurnAnswer({ audioBase64: base64Audio });
+        const capturedText = liveTranscriptRef.current.trim() || currentAnswer.trim();
+        await dispatchTurnAnswer({ 
+          textAnswer: capturedText || undefined, 
+          audioBase64: base64Audio 
+        });
       };
     };
 
@@ -431,6 +443,39 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       setIsRecordingVoice(true);
       setRecordingSeconds(0);
       setAvatarState("listening");
+
+      // Initialize browser-side SpeechRecognition for sub-second transcript streaming
+      liveTranscriptRef.current = "";
+      if (typeof window !== "undefined") {
+        const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (SpeechRec) {
+          try {
+            const recognition = new SpeechRec();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = "en-US";
+            recognition.onresult = (event: any) => {
+              let interim = "";
+              for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                  liveTranscriptRef.current += event.results[i][0].transcript + " ";
+                } else {
+                  interim += event.results[i][0].transcript;
+                }
+              }
+              const fullText = (liveTranscriptRef.current + " " + interim).trim();
+              if (fullText) {
+                setCurrentAnswer(fullText);
+              }
+            };
+            recognition.onerror = () => {};
+            recognition.start();
+            speechRecognitionRef.current = recognition;
+          } catch (e) {
+            console.warn("SpeechRecognition init skipped:", e);
+          }
+        }
+      }
 
       // Start recording seconds counter
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);

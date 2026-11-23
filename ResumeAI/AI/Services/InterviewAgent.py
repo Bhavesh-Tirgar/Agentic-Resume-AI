@@ -36,21 +36,24 @@ class InterviewAgent:
         """
         transcribed_text = ""
 
-        # 1. Transcribe audio if provided
-        if audio_file:
+        # 1. Fast-Path: If direct text transcript is already available, skip Whisper entirely (<1ms)
+        if text_answer and text_answer.strip():
+            logger.info("InterviewAgent: Fast-Path text transcript provided, skipping Whisper.")
+            resolved_answer = text_answer.strip()
+            used_whisper = False
+        elif audio_file:
             logger.info("InterviewAgent: Transcribing incoming audio file with Whisper...")
-            transcribed_text = WhisperAudioService.transcribe(audio_file)
+            resolved_answer = WhisperAudioService.transcribe(audio_file)
+            used_whisper = True
         elif audio_base64:
             logger.info("InterviewAgent: Transcribing base64 audio with Whisper...")
-            transcribed_text = WhisperAudioService.transcribe_base64(audio_base64)
-
-        # 2. Resolve final candidate answer
-        resolved_answer = text_answer.strip() if text_answer and text_answer.strip() else transcribed_text
-
-        if not resolved_answer:
+            resolved_answer = WhisperAudioService.transcribe_base64(audio_base64)
+            used_whisper = True
+        else:
             resolved_answer = "No audible answer detected. Could you please clarify your response?"
+            used_whisper = False
 
-        # 3. Evaluate response using Bar Raiser reasoning
+        # 2. Evaluate response using Bar Raiser reasoning
         eval_result = self.hr_service.evaluate_turn(
             session_id=session_id,
             candidate_answer=resolved_answer,
@@ -60,6 +63,6 @@ class InterviewAgent:
 
         # Attach transcription information
         eval_result["transcribed_text"] = resolved_answer
-        eval_result["used_whisper"] = bool(audio_file or audio_base64)
+        eval_result["used_whisper"] = used_whisper
 
         return eval_result
