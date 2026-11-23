@@ -53,6 +53,7 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
     const prevCentroidRef = useRef<{ x: number; y: number } | null>(null);
     const saccadeSweepCounterRef = useRef<number>(0);
     const lastXDeltaSignRef = useRef<number>(0);
+    const lastDecaySecRef = useRef<number>(0);
 
     // Initialize Camera Stream
     useEffect(() => {
@@ -239,8 +240,8 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
 
                 // Gradual decay: reduce counter by 2 every ~3 seconds so brief glances don't lock in the flag
                 const nowSec = Math.floor(Date.now() / 3000);
-                if (!saccadeSweepCounterRef._lastDecaySec || saccadeSweepCounterRef._lastDecaySec !== nowSec) {
-                  saccadeSweepCounterRef._lastDecaySec = nowSec;
+                if (lastDecaySecRef.current !== nowSec) {
+                  lastDecaySecRef.current = nowSec;
                   saccadeSweepCounterRef.current = Math.max(0, saccadeSweepCounterRef.current - 2);
                 }
               }
