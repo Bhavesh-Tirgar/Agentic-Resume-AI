@@ -2,8 +2,8 @@
 
 ## Current Milestone
 - **Phase:** Phase 7 - Project J.A.R.V.I.S. (Sub-Second Full-Duplex Multimodal Interviewer v3.0)
-- **Active Sprint:** Milestone 7.1 — Real-Time Streaming Audio Gateway & Barge-In
-- **Status:** Architecture approved (`JARVIS_AI_INTERVIEWER_MASTER_SPEC.md`). In execution.
+- **Active Sprint:** Milestone 7.2 — Client-Side MediaPipe Vision Engine (30 FPS)
+- **Status:** Milestone 7.1 completed & verified. Moving to M7.2.
 - **Git Branch:** `main`
 - **Remote Origin:** `https://github.com/Bhavesh-Tirgar/Agentic-Resume-AI.git`
 - **Upstream:** `https://github.com/Hardik-RS/Agentic_AI_Project.git`
