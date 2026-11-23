@@ -206,6 +206,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     setAvatarState("thinking");
     const isCamOn = cameraRef.current?.isCameraActive?.() ?? false;
     const snapshot = isCamOn ? cameraRef.current?.captureSnapshot() : null;
+    const liveVision = isCamOn ? cameraRef.current?.getLiveTelemetry?.() : null;
 
     try {
       const res = await sendVirtualHRAnswerApi({
@@ -213,12 +214,18 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         candidate_answer: textAnswer,
         audio_base64: audioBase64,
         snapshot_base64: snapshot || undefined,
-        vision_telemetry: {
-          eye_contact_percentage: isCamOn ? 75 : 0,
-          confidence_score: isCamOn ? 70 : 15,
-          nervousness_score: isCamOn ? 25 : 0,
-          gaze_direction: isCamOn ? "Direct / Focused" : "Camera Off / Disabled",
-          facial_demeanor: isCamOn ? "Composed" : "Camera Off"
+        vision_telemetry: isCamOn && liveVision ? {
+          eye_contact_percentage: liveVision.eye_contact_percentage,
+          confidence_score: liveVision.confidence_score,
+          nervousness_score: liveVision.nervousness_score,
+          gaze_direction: liveVision.gaze_direction,
+          facial_demeanor: liveVision.facial_demeanor
+        } : {
+          eye_contact_percentage: 0,
+          confidence_score: 20,
+          nervousness_score: 0,
+          gaze_direction: "Camera Off / Disabled",
+          facial_demeanor: "Camera Off"
         }
       });
 
