@@ -3,6 +3,8 @@ from .JobMatchResult import JobMatchResult
 from .ResumeAnalysisResult import ResumeAnalysisResult
 from .ResumeParserResult import ResumeParserResult
 from .ResumeScoreResult import ResumeScoreResult
+from .JobDiscoveryResult import JobDiscoveryResult
+from .InterviewSessionRecord import InterviewSessionRecord
 
 __all__ = [
     "InterviewPlanResult",
@@ -10,4 +12,6 @@ __all__ = [
     "ResumeAnalysisResult",
     "ResumeParserResult",
     "ResumeScoreResult",
+    "JobDiscoveryResult",
+    "InterviewSessionRecord",
 ]

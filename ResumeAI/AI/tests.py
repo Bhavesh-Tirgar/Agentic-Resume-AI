@@ -244,3 +244,49 @@ class AITests(TestCase):
         get_res = self.client.get(url)
         self.assertEqual(get_res.status_code, status.HTTP_200_OK)
         self.assertEqual(get_res.data["interview_plan_id"], plan_id)
+
+    def test_tri_tier_interview_session_persistence(self):
+        """Test InterviewSessionManager writes to DB and rehydrates after cache clear"""
+        from AI.Services.InterviewSessionManager import session_manager, _LOCAL_SESSION_STORE
+        from AI.Models.InterviewSessionRecord import InterviewSessionRecord
+
+        session = session_manager.create_session(
+            candidate_name="Enterprise Dev",
+            target_role="Staff Platform Engineer",
+            user_id=self.user.id,
+            max_rounds=3
+        )
+        s_id = session["session_id"]
+
+        # Verify DB entry created
+        record = InterviewSessionRecord.objects.filter(session_id=s_id).first()
+        self.assertIsNotNone(record)
+        self.assertEqual(record.candidate_name, "Enterprise Dev")
+        self.assertEqual(record.target_role, "Staff Platform Engineer")
+
+        # Clear memory cache
+        _LOCAL_SESSION_STORE.clear()
+
+        # Rehydrate from DB
+        rehydrated = session_manager.get_session(s_id)
+        self.assertIsNotNone(rehydrated)
+        self.assertEqual(rehydrated["candidate_name"], "Enterprise Dev")
+        self.assertEqual(rehydrated["target_role"], "Staff Platform Engineer")
+
+    def test_virtual_hr_history_api_view(self):
+        """Test GET /api/ai/interview/live/history/ retrieves candidate audit history"""
+        from AI.Services.InterviewSessionManager import session_manager
+
+        session_manager.create_session(
+            candidate_name="Test Candidate",
+            target_role="Lead SRE",
+            user_id=self.user.id,
+            max_rounds=4
+        )
+
+        url = reverse("virtual-hr-history")
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("history", res.data)
+        self.assertTrue(len(res.data["history"]) >= 1)
+

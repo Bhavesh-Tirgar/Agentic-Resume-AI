@@ -36,6 +36,7 @@ class VirtualHRService:
         candidate_name: Optional[str] = None,
         target_role: Optional[str] = None,
         resume_id: Optional[int] = None,
+        user_id: Optional[int] = None,
         max_rounds: int = 4
     ) -> Dict[str, Any]:
         """
@@ -61,6 +62,7 @@ class VirtualHRService:
             candidate_name=resolved_name,
             target_role=resolved_role,
             resume_id=resume_id,
+            user_id=user_id,
             max_rounds=max_rounds
         )
 

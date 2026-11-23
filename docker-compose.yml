@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # Distributed Cache for Session Memory & Barge-In State
+  redis:
+    image: redis:7-alpine
+    container_name: resumeai_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Primary Relational Store for Resume, User Auth & Interview Audits
+  postgres:
+    image: postgres:16-alpine
+    container_name: resumeai_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: resume_ai_db
+      POSTGRES_USER: resume_user
+      POSTGRES_PASSWORD: secure_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resume_user -d resume_ai_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Hardened Django Backend with Multi-Agent Orchestration & Whisper
+  backend:
+    build:
+      context: ./ResumeAI
+      dockerfile: Dockerfile
+    container_name: resumeai_backend
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-docker-orchestration-dev-key-production-ready
+      - REDIS_URL=redis://redis:6379/0
+      - DB_NAME=resume_ai_db
+      - DB_USER=resume_user
+      - DB_PASSWORD=secure_dev_password
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./ResumeAI/media:/app/media
+
+  # Next.js 14 App Router Luxury Dark Frontend with Canvas Vision HUD
+  frontend:
+    build:
+      context: ./resume-ai-next
+      dockerfile: Dockerfile
+    container_name: resumeai_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=production
+
+volumes:
+  redis_data:
+  postgres_data:

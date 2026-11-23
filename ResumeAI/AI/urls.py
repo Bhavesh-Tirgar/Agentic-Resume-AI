@@ -8,6 +8,7 @@ from .views import (
     VirtualHRTurnView,
     VirtualHRFinishView,
     VirtualHRSessionView,
+    VirtualHRHistoryView,
     WhisperTranscribeView,
 )
 
@@ -22,5 +23,6 @@ urlpatterns = [
     path("interview/live/turn/", VirtualHRTurnView.as_view(), name="virtual-hr-turn"),
     path("interview/live/finish/", VirtualHRFinishView.as_view(), name="virtual-hr-finish"),
     path("interview/live/session/<str:session_id>/", VirtualHRSessionView.as_view(), name="virtual-hr-session"),
+    path("interview/live/history/", VirtualHRHistoryView.as_view(), name="virtual-hr-history"),
     path("interview/live/whisper/", WhisperTranscribeView.as_view(), name="virtual-hr-whisper"),
 ]

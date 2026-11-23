@@ -330,6 +330,7 @@ class VirtualHRStartView(APIView):
         target_role = request.data.get("target_role", "Senior Software Engineer")
         resume_id = request.data.get("resume_id")
         max_rounds = int(request.data.get("max_rounds", 4))
+        user_id = request.user.id if request.user and request.user.is_authenticated else None
 
         try:
             from AI.Services.VirtualHRService import VirtualHRService
@@ -338,6 +339,7 @@ class VirtualHRStartView(APIView):
                 candidate_name=candidate_name,
                 target_role=target_role,
                 resume_id=resume_id,
+                user_id=user_id,
                 max_rounds=max_rounds
             )
             return Response(result, status=status.HTTP_201_CREATED)
@@ -434,4 +436,16 @@ class VirtualHRSessionView(APIView):
         if not session:
             return Response({"error": "Session not found or expired."}, status=status.HTTP_404_NOT_FOUND)
         return Response(session, status=status.HTTP_200_OK)
+
+
+class VirtualHRHistoryView(APIView):
+    """Retrieves candidate past mock interview audit sessions and scorecards."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from AI.Services.InterviewSessionManager import session_manager
+        user_id = request.user.id if request.user and request.user.is_authenticated else None
+        limit = int(request.query_params.get("limit", 10))
+        history = session_manager.list_candidate_history(user_id=user_id, limit=limit)
+        return Response({"history": history}, status=status.HTTP_200_OK)
 
