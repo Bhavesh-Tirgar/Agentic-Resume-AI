@@ -128,14 +128,23 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     }
   };
 
-  // Native Audio Recording via MediaRecorder + Whisper
+  // Native Audio Recording via MediaRecorder + Whisper & Real-Time VAD
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [isHandsFree, setIsHandsFree] = useState(true);
+  const [bargeInNotice, setBargeInNotice] = useState<string | null>(null);
+
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasSpokenRef = useRef(false);
 
   // 5-Minute Timer Countdown Loop
   useEffect(() => {
@@ -174,20 +183,170 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     }
   }, [sessionId, scorecard, isFinishing, onFinish]);
 
-  // Cleanup media recording on unmount
+  // Cleanup media recording and audio context on unmount
   useEffect(() => {
     return () => {
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        audioContextRef.current.close().catch(() => {});
+      }
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, []);
 
-  // Start microphone recording using native HTML5 MediaRecorder
-  const startRecording = async () => {
+  // Dispatch turn answer (supports both direct text and direct single-hop audio base64)
+  const dispatchTurnAnswer = async ({ textAnswer, audioBase64 }: { textAnswer?: string; audioBase64?: string }) => {
+    if (!sessionId || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setAvatarState("thinking");
+    const isCamOn = cameraRef.current?.isCameraActive?.() ?? false;
+    const snapshot = isCamOn ? cameraRef.current?.captureSnapshot() : null;
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const res = await sendVirtualHRAnswerApi({
+        session_id: sessionId,
+        candidate_answer: textAnswer,
+        audio_base64: audioBase64,
+        snapshot_base64: snapshot || undefined,
+        vision_telemetry: {
+          eye_contact_percentage: isCamOn ? 75 : 0,
+          confidence_score: isCamOn ? 70 : 15,
+          nervousness_score: isCamOn ? 25 : 0,
+          gaze_direction: isCamOn ? "Direct / Focused" : "Camera Off / Disabled",
+          facial_demeanor: isCamOn ? "Composed" : "Camera Off"
+        }
+      });
+
+      const resolvedAnswerText = res.transcribed_text || textAnswer || (audioBase64 ? "Spoken response submitted" : "");
+
+      // Update turn record
+      setTurns((prev) => {
+        const copy = [...prev];
+        if (copy.length > 0) {
+          copy[copy.length - 1].answer = resolvedAnswerText;
+          copy[copy.length - 1].feedback = res.evaluation.critique;
+        }
+        if (!res.is_final_round && res.next_question) {
+          copy.push({
+            round: res.next_round,
+            question: res.next_question
+          });
+        }
+        return copy;
+      });
+
+      setAvatarState("idle");
+      setLatestFeedback(res.evaluation.critique);
+      setCurrentAnswer("");
+
+      // Play Marcus Vance's response with natural neural voice and lip-sync
+      if (res.audio_base64) {
+        currentAudioBase64Ref.current = res.audio_base64;
+        playNeuralAudio(res.audio_base64);
+      }
+
+      if (res.is_final_round) {
+        handleFinishInterview();
+      } else if (res.next_question) {
+        setCurrentRound(res.next_round);
+        setCurrentQuestion(res.next_question);
+        setTextToSpeak(null);
+
+        // In hands-free JARVIS mode, re-arm microphone after Marcus finishes speaking
+        if (isHandsFree) {
+          if (audioPlayerRef.current) {
+            audioPlayerRef.current.onended = () => {
+              setAvatarState("idle");
+              setTimeout(() => {
+                startRecording();
+              }, 400);
+            };
+          } else {
+            setTimeout(() => {
+              startRecording();
+            }, 600);
+          }
+        }
+      }
+    } catch (err: any) {
+      setAvatarState("idle");
+      alert("Error submitting answer: " + (err.message || "Unknown error"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Stop recording and single-hop submit audio to backend
+  const stopRecordingAndSubmit = useCallback(async () => {
+    if (!mediaRecorderRef.current || !isRecordingVoice) return;
+
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+
+    const recorder = mediaRecorderRef.current;
+
+    recorder.onstop = async () => {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+      analyserRef.current = null;
+      setAudioLevel(0);
+      setIsRecordingVoice(false);
+
+      const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+      if (audioBlob.size < 500) {
+        setAvatarState("idle");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = async () => {
+        const base64Audio = reader.result as string;
+        await dispatchTurnAnswer({ audioBase64: base64Audio });
+      };
+    };
+
+    recorder.stop();
+  }, [isRecordingVoice, sessionId]);
+
+  // Start microphone recording with Web Audio API VAD & Barge-in
+  const startRecording = async () => {
+    // If Marcus Vance is currently speaking, barge in and stop him immediately
+    if (avatarState === "speaking") {
+      handleStopSpeaking();
+      setBargeInNotice("Barge-In: Marcus yielded the floor to you.");
+      setTimeout(() => setBargeInNotice(null), 3000);
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
       mediaStreamRef.current = stream;
       audioChunksRef.current = [];
 
@@ -205,6 +364,58 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         }
       };
 
+      // Set up Web Audio AnalyserNode for live soundwave visualization & VAD
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = audioCtx;
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const pcmData = new Uint8Array(analyser.frequencyBinCount);
+      hasSpokenRef.current = false;
+
+      const checkVolume = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(pcmData);
+        let sum = 0;
+        for (let i = 0; i < pcmData.length; i++) {
+          sum += pcmData[i];
+        }
+        const avg = sum / pcmData.length / 255;
+        setAudioLevel(avg);
+
+        // Barge-In detection while Marcus is speaking
+        if (avatarState === "speaking" && avg > 0.05) {
+          handleStopSpeaking();
+          setBargeInNotice("Barge-In: Marcus yielded the floor to you.");
+          setTimeout(() => setBargeInNotice(null), 3000);
+        }
+
+        // Voice Activity Detection for Hands-Free Auto-Submit
+        if (avg > 0.04) {
+          hasSpokenRef.current = true;
+          if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+          }
+        } else if (hasSpokenRef.current && avg <= 0.02 && isHandsFree) {
+          // If silence detected after speaking, schedule auto-submission
+          if (!silenceTimerRef.current) {
+            silenceTimerRef.current = setTimeout(() => {
+              if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+                stopRecordingAndSubmit();
+              }
+            }, 1800);
+          }
+        }
+
+        animFrameRef.current = requestAnimationFrame(checkVolume);
+      };
+
+      animFrameRef.current = requestAnimationFrame(checkVolume);
+
       recorder.start(250); // collect 250ms chunks
       setIsRecordingVoice(true);
       setRecordingSeconds(0);
@@ -218,65 +429,6 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     } catch (err: any) {
       alert("Microphone access denied or not available. Please allow mic permissions in your browser or type your answer below.");
     }
-  };
-
-  // Stop recording and send audio to local Whisper engine
-  const stopRecordingAndTranscribe = async () => {
-    if (!mediaRecorderRef.current || !isRecordingVoice) return;
-
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-
-    const recorder = mediaRecorderRef.current;
-
-    recorder.onstop = async () => {
-      // Release mic stream
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-        mediaStreamRef.current = null;
-      }
-
-      setIsRecordingVoice(false);
-      const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
-
-      if (audioBlob.size < 500) {
-        setAvatarState("idle");
-        return;
-      }
-
-      // Convert Blob to base64
-      setIsTranscribing(true);
-      setAvatarState("thinking");
-
-      try {
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = async () => {
-          const base64Audio = reader.result as string;
-          try {
-            const res = await transcribeWhisperAudioApi(base64Audio);
-            const transcribed = res.transcribed_text?.trim() || "";
-            if (transcribed) {
-              setCurrentAnswer((prev) => (prev ? `${prev} ${transcribed}` : transcribed));
-            }
-          } catch (err: any) {
-            console.error("Whisper transcription failed:", err);
-            alert("Whisper speech-to-text error: " + (err.message || "Failed to transcribe audio"));
-          } finally {
-            setIsTranscribing(false);
-            setAvatarState("idle");
-          }
-        };
-      } catch (err: any) {
-        console.error("FileReader failed:", err);
-        setIsTranscribing(false);
-        setAvatarState("idle");
-      }
-    };
-
-    recorder.stop();
   };
 
   const handleStartInterview = async () => {
@@ -312,6 +464,16 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       if (res.audio_base64) {
         currentAudioBase64Ref.current = res.audio_base64;
         playNeuralAudio(res.audio_base64);
+
+        // If hands-free mode is on, auto-arm microphone after Marcus finishes opening remark
+        if (isHandsFree && audioPlayerRef.current) {
+          audioPlayerRef.current.onended = () => {
+            setAvatarState("idle");
+            setTimeout(() => {
+              startRecording();
+            }, 500);
+          };
+        }
       }
     } catch (err: any) {
       alert("Failed to start mock interview: " + (err.message || "Unknown error"));
@@ -324,68 +486,14 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     if (!sessionId || !currentAnswer.trim() || isSubmitting) return;
 
     if (isRecordingVoice) {
-      await stopRecordingAndTranscribe();
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
+      setIsRecordingVoice(false);
     }
 
-    setIsSubmitting(true);
-    setAvatarState("thinking");
-    const submittedText = currentAnswer.trim();
-    const isCamOn = cameraRef.current?.isCameraActive?.() ?? false;
-    const snapshot = isCamOn ? cameraRef.current?.captureSnapshot() : null;
-
-    try {
-      const res = await sendVirtualHRAnswerApi({
-        session_id: sessionId,
-        candidate_answer: submittedText,
-        snapshot_base64: snapshot || undefined,
-        vision_telemetry: {
-          eye_contact_percentage: isCamOn ? 75 : 0,
-          confidence_score: isCamOn ? 70 : 15,
-          nervousness_score: isCamOn ? 25 : 0,
-          gaze_direction: isCamOn ? "Direct / Focused" : "Camera Off / Disabled",
-          facial_demeanor: isCamOn ? "Composed" : "Camera Off"
-        }
-      });
-
-      // Update turn record
-      setTurns((prev) => {
-        const copy = [...prev];
-        if (copy.length > 0) {
-          copy[copy.length - 1].answer = submittedText;
-          copy[copy.length - 1].feedback = res.evaluation.critique;
-        }
-        if (!res.is_final_round && res.next_question) {
-          copy.push({
-            round: res.next_round,
-            question: res.next_question
-          });
-        }
-        return copy;
-      });
-
-      setAvatarState("idle");
-      setLatestFeedback(res.evaluation.critique);
-      setCurrentAnswer("");
-
-      // Play Marcus Vance's response with natural neural voice and lip-sync
-      if (res.audio_base64) {
-        currentAudioBase64Ref.current = res.audio_base64;
-        playNeuralAudio(res.audio_base64);
-      }
-
-      if (res.is_final_round) {
-        handleFinishInterview();
-      } else if (res.next_question) {
-        setCurrentRound(res.next_round);
-        setCurrentQuestion(res.next_question);
-        setTextToSpeak(null);
-      }
-    } catch (err: any) {
-      setAvatarState("idle");
-      alert("Error submitting answer: " + (err.message || "Unknown error"));
-    } finally {
-      setIsSubmitting(false);
-    }
+    await dispatchTurnAnswer({ textAnswer: currentAnswer.trim() });
   };
 
   const handleFinishInterview = async () => {
@@ -869,9 +977,17 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
         </div>
       )}
 
-      {/* Candidate Response Console (Whisper Voice + Text) */}
+      {/* Barge-In Interruption Notification */}
+      {bargeInNotice && (
+        <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2 animate-bounce">
+          <Radio className="w-4 h-4 text-blue-500 animate-pulse" />
+          <span className="font-semibold">{bargeInNotice}</span>
+        </div>
+      )}
+
+      {/* Candidate Response Console (Whisper Voice + Text + Real-time VAD) */}
       <div className="rounded-2xl border border-slate-200 dark:border-[#202533] bg-white dark:bg-[#111318] p-5 shadow-lg space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
               <Mic className="w-3.5 h-3.5 text-emerald-500" />
@@ -880,56 +996,85 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
             {isRecordingVoice && (
               <span className="flex items-center gap-1.5 text-[11px] font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20">
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                <span>Recording {recFormatted}</span>
+                <span>Live Audio {recFormatted}</span>
               </span>
             )}
-            {isTranscribing && (
+            {isSubmitting && (
               <span className="flex items-center gap-1.5 text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
                 <RefreshCw className="w-3 h-3 animate-spin" />
-                <span>Whisper Transcribing...</span>
+                <span>Evaluating Response...</span>
               </span>
             )}
           </div>
 
-          {/* Voice Record Toggle Button */}
+          {/* Voice Mode Controls */}
           <div className="flex items-center gap-2">
+            {/* Hands-Free JARVIS VAD Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsHandsFree(!isHandsFree)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono border transition cursor-pointer ${
+                isHandsFree 
+                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                  : "bg-slate-100 dark:bg-[#191d28] text-slate-500 border-slate-200 dark:border-[#282d3c]"
+              }`}
+              title="Toggle Hands-Free Auto-Turn (Auto-submits when you stop speaking)"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${isHandsFree ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+              <span>JARVIS Auto-Turn: {isHandsFree ? "ON" : "OFF"}</span>
+            </button>
+
+            {/* Voice Record Toggle Button */}
             {!isRecordingVoice ? (
               <button
                 type="button"
                 onClick={startRecording}
-                disabled={isTranscribing || isSubmitting}
+                disabled={isSubmitting}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer shadow-xs disabled:opacity-40"
               >
                 <Mic className="w-3.5 h-3.5" />
-                <span>Record Voice</span>
+                <span>Start Speaking</span>
               </button>
             ) : (
               <button
                 type="button"
-                onClick={stopRecordingAndTranscribe}
+                onClick={stopRecordingAndSubmit}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer shadow-xs animate-pulse"
               >
                 <MicOff className="w-3.5 h-3.5" />
-                <span>Done Speaking</span>
+                <span>Finish & Submit</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Live Audio Waveform Animation while recording */}
+        {/* Real Live Audio Waveform Equalizer driven by Web Audio API */}
         {isRecordingVoice && (
-          <div className="flex items-center justify-center gap-1 py-2 bg-slate-50 dark:bg-[#151821] rounded-xl border border-slate-200 dark:border-[#262b3a]">
-            <span className="text-[11px] font-mono text-slate-500 mr-2">Speaking...</span>
-            {[40, 70, 90, 50, 100, 65, 80, 45, 95, 60, 85, 30].map((h, i) => (
-              <span
-                key={i}
-                className="w-1 bg-emerald-500 rounded-full animate-pulse"
-                style={{
-                  height: `${Math.max(8, (h * (recordingSeconds % 3 + 1)) % 28)}px`,
-                  animationDelay: `${i * 80}ms`
-                }}
-              />
-            ))}
+          <div className="flex items-center justify-between px-4 py-2 bg-slate-50 dark:bg-[#151821] rounded-xl border border-slate-200 dark:border-[#262b3a]">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-emerald-500 font-semibold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Speaking to Marcus
+              </span>
+              {isHandsFree && (
+                <span className="text-[10px] text-slate-400 font-mono">
+                  (Auto-submits after 1.8s pause)
+                </span>
+              )}
+            </div>
+            {/* Live Frequency Bars */}
+            <div className="flex items-center gap-1">
+              {[0.4, 0.8, 1.2, 0.6, 1.5, 0.9, 1.1, 0.5, 1.4, 0.7, 1.0, 0.3].map((factor, i) => {
+                const height = Math.max(6, Math.min(32, audioLevel * factor * 140));
+                return (
+                  <span
+                    key={i}
+                    className="w-1 bg-emerald-500 rounded-full transition-all duration-75"
+                    style={{ height: `${height}px` }}
+                  />
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -938,7 +1083,7 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
           rows={3}
           value={currentAnswer}
           onChange={(e) => setCurrentAnswer(e.target.value)}
-          placeholder="Speak with the mic button above, or type your response here..."
+          placeholder="Speak naturally into your mic (JARVIS hands-free mode active), or type your answer here..."
           className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-[#262b3a] bg-slate-50 dark:bg-[#151821] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 text-xs focus:outline-hidden focus:border-emerald-500 transition leading-relaxed resize-none"
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -950,12 +1095,12 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
 
         <div className="flex items-center justify-between pt-1">
           <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500">
-            {isRecordingVoice ? "Click 'Done Speaking' to transcribe" : "Press Ctrl+Enter or Submit"}
+            {isRecordingVoice ? (isHandsFree ? "Speak freely — pauses auto-submit" : "Click 'Finish & Submit' when done") : "Press Ctrl+Enter or Submit"}
           </span>
 
           <button
             onClick={handleSubmitAnswer}
-            disabled={!currentAnswer.trim() || isSubmitting || isTranscribing}
+            disabled={!currentAnswer.trim() || isSubmitting}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-semibold text-xs hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-40"
           >
             {isSubmitting ? (
