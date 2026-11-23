@@ -208,9 +208,13 @@ export function InterviewerAvatar3D({
 
       // 3. Natural Breathing & Head Kinematics
       const breathing = Math.sin(time * 1.5) * 2.5;
-      const headTilt = internalState === "listening" ? 3 : 0;
+      const listeningNod = internalState === "listening" ? Math.sin(time * 2.2) * 3.5 : 0;
+      const headTilt = internalState === "listening" ? 3.5 : 0;
+      const eyeMicroSaccadeX = Math.sin(time * 3.1) * 0.8;
+      const eyeMicroSaccadeY = Math.cos(time * 2.7) * 0.5;
+
       const headX = cx + gazeX * 14;
-      const headY = cy - 30 + gazeY * 10 + breathing + headTilt;
+      const headY = cy - 30 + gazeY * 10 + breathing + headTilt + listeningNod;
 
       // 4. Executive Shoulders & Suit Torso
       ctx.save();
@@ -284,24 +288,27 @@ export function InterviewerAvatar3D({
       ctx.fillStyle = "#1c1815";
       ctx.fill();
 
-      // 7. Executive Eyebrows
+      // 7. Executive Eyebrows (Dynamic Elevation based on cognitive state)
+      const leftBrowElevation = internalState === "thinking" ? 4.5 : 0;
+      const rightBrowElevation = internalState === "listening" ? 1.5 : 0;
+
       ctx.beginPath();
-      ctx.moveTo(headX - 32 + gazeX * 3, headY - 15 + gazeY * 2);
-      ctx.lineTo(headX - 10 + gazeX * 3, headY - 17 + gazeY * 2);
-      ctx.moveTo(headX + 10 + gazeX * 3, headY - 17 + gazeY * 2);
-      ctx.lineTo(headX + 32 + gazeX * 3, headY - 15 + gazeY * 2);
+      ctx.moveTo(headX - 32 + gazeX * 3, headY - 15 - leftBrowElevation + gazeY * 2);
+      ctx.lineTo(headX - 10 + gazeX * 3, headY - 17 - leftBrowElevation + gazeY * 2);
+      ctx.moveTo(headX + 10 + gazeX * 3, headY - 17 - rightBrowElevation + gazeY * 2);
+      ctx.lineTo(headX + 32 + gazeX * 3, headY - 15 - rightBrowElevation + gazeY * 2);
       ctx.strokeStyle = "#1a1614";
       ctx.lineWidth = 3.5;
       ctx.lineCap = "round";
       ctx.stroke();
 
-      // 8. Eyes & Interactive Gaze
+      // 8. Eyes & Interactive Gaze with Natural Micro-Saccades
       const eyeOffsetX = 19;
       const eyeOffsetY = -5;
 
       [-eyeOffsetX, eyeOffsetX].forEach((offsetX) => {
-        const eyeCenterX = headX + offsetX + gazeX * 4;
-        const eyeCenterY = headY + eyeOffsetY + gazeY * 3;
+        const eyeCenterX = headX + offsetX + gazeX * 4 + eyeMicroSaccadeX;
+        const eyeCenterY = headY + eyeOffsetY + gazeY * 3 + eyeMicroSaccadeY;
 
         if (isBlinking) {
           ctx.beginPath();
@@ -318,8 +325,8 @@ export function InterviewerAvatar3D({
           ctx.fill();
 
           // Iris (Deep Hazel-Brown)
-          const irisX = eyeCenterX + gazeX * 3.5;
-          const irisY = eyeCenterY + gazeY * 2.5;
+          const irisX = eyeCenterX + gazeX * 3.5 + eyeMicroSaccadeX * 0.4;
+          const irisY = eyeCenterY + gazeY * 2.5 + eyeMicroSaccadeY * 0.4;
           ctx.beginPath();
           ctx.arc(irisX, irisY, 4.2, 0, Math.PI * 2);
           ctx.fillStyle = "#4a3525";
@@ -349,26 +356,55 @@ export function InterviewerAvatar3D({
       ctx.lineCap = "round";
       ctx.stroke();
 
-      // 10. Dynamic Mouth (Speaking Lip-Sync vs Neutral Smile)
+      // 10. Multi-Phoneme Viseme Lip-Sync (Audio-Harmonic Synthesis)
       const mouthX = headX + gazeX * 3.5;
       const mouthY = headY + 30 + gazeY * 3;
 
       if (internalState === "speaking") {
-        const mouthOpen = (Math.sin(time * 9) + 1) * 4.5 + 2;
+        // Multi-frequency harmonic viseme synthesis
+        const vFundamental = Math.sin(time * 9.5);
+        const vMidHarmonic = Math.cos(time * 15.2);
+        const vConsonant = Math.sin(time * 22.0) * 0.35;
+        
+        // jawOpen: primary vertical aperture (AA, O, UH)
+        const jawOpen = Math.max(1.8, Math.min(10.5, (vFundamental * 0.5 + vMidHarmonic * 0.3 + 0.8) * 5.2));
+        // mouthWidth: horizontal stretch (EE, S, T)
+        const mouthWidth = Math.max(9, Math.min(16, 12.5 + vMidHarmonic * 2.8 + vConsonant * 1.5));
+        const isPuckered = jawOpen < 4.0 && vMidHarmonic > 0.4;
+        const currentMouthWidth = isPuckered ? mouthWidth * 0.75 : mouthWidth;
+
         ctx.beginPath();
-        ctx.ellipse(mouthX, mouthY, 13, mouthOpen, 0, 0, Math.PI * 2);
+        ctx.ellipse(mouthX, mouthY, currentMouthWidth, jawOpen, 0, 0, Math.PI * 2);
         ctx.fillStyle = "#451616";
         ctx.fill();
         ctx.strokeStyle = "#823232";
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Upper Teeth Highlight
+        // Upper Teeth Definition during wide/open vowels
+        if (jawOpen > 3.0) {
+          ctx.beginPath();
+          ctx.rect(mouthX - currentMouthWidth * 0.55, mouthY - jawOpen + 1, currentMouthWidth * 1.1, Math.min(2.8, jawOpen * 0.4));
+          ctx.fillStyle = "#f8fafc";
+          ctx.fill();
+        }
+        // Lower Teeth definition during deep open vowels
+        if (jawOpen > 6.5) {
+          ctx.beginPath();
+          ctx.rect(mouthX - currentMouthWidth * 0.45, mouthY + jawOpen - 2.5, currentMouthWidth * 0.9, 2);
+          ctx.fillStyle = "#e2e8f0";
+          ctx.fill();
+        }
+      } else if (internalState === "listening") {
+        // Attentive receptive parting of lips
         ctx.beginPath();
-        ctx.rect(mouthX - 7, mouthY - mouthOpen + 1, 14, Math.min(3, mouthOpen));
-        ctx.fillStyle = "#ffffff";
-        ctx.fill();
+        ctx.arc(mouthX, mouthY - 2, 10.5, 0.1, Math.PI - 0.1);
+        ctx.strokeStyle = "#7a3826";
+        ctx.lineWidth = 2.0;
+        ctx.lineCap = "round";
+        ctx.stroke();
       } else {
+        // Neutral executive composed smile
         ctx.beginPath();
         ctx.arc(mouthX, mouthY - 3, 11, 0.15, Math.PI - 0.15);
         ctx.strokeStyle = "#7a3826";
