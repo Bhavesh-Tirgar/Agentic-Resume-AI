@@ -18,7 +18,26 @@ def build_heuristic_dossier(text: str) -> UnifiedDossierSchema:
     fake numbers, revenue metrics, or hallucinated corporate employers.
     """
     lines = [line.strip() for line in text.split("\n") if line.strip()]
-    name = lines[0] if lines else "Candidate"
+    
+    # Smart header-stripping to eliminate "Mr. Curriculum Vitae" bugs
+    ignore_headers = {
+        "curriculum vitae", "resume", "cv", "confidential", "profile", "bio",
+        "biodata", "contact", "about me", "personal details", "executive summary"
+    }
+    name = "Candidate"
+    for line in lines[:8]:
+        cleaned = line.strip()
+        lower_line = cleaned.lower().strip(": -#*")
+        if (
+            lower_line in ignore_headers
+            or "@" in cleaned
+            or any(d.isdigit() for d in cleaned)
+            or len(cleaned) < 3
+            or len(cleaned) > 50
+        ):
+            continue
+        name = cleaned
+        break
     
     email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", text)
     email = email_match.group(0) if email_match else "candidate@example.com"

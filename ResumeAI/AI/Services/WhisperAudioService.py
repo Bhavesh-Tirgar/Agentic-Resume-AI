@@ -1,4 +1,5 @@
 import os
+import io
 import tempfile
 import logging
 import base64
@@ -37,31 +38,41 @@ class WhisperAudioService:
         temp_file_path = None
 
         try:
-            # If raw bytes, write to a temp file
+            # High-Performance In-Memory Fast Path: Stream directly from RAM without disk I/O
             if isinstance(audio_source, bytes):
-                with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as f:
-                    f.write(audio_source)
-                    temp_file_path = f.name
-                file_to_transcribe = temp_file_path
+                file_to_transcribe = io.BytesIO(audio_source)
             elif hasattr(audio_source, "read"):
-                # File-like object (e.g. Django UploadedFile)
                 content = audio_source.read()
-                with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as f:
-                    f.write(content)
-                    temp_file_path = f.name
-                file_to_transcribe = temp_file_path
+                file_to_transcribe = io.BytesIO(content) if isinstance(content, bytes) else content
             else:
                 file_to_transcribe = audio_source
 
-            segments, info = model.transcribe(
-                file_to_transcribe,
-                beam_size=1,
-                language="en",
-                vad_filter=True,
-                vad_parameters=dict(min_silence_duration_ms=500)
-            )
-
-            transcription = " ".join(segment.text.strip() for segment in segments).strip()
+            try:
+                segments, info = model.transcribe(
+                    file_to_transcribe,
+                    beam_size=1,
+                    language="en",
+                    vad_filter=True,
+                    vad_parameters=dict(min_silence_duration_ms=500)
+                )
+                transcription = " ".join(segment.text.strip() for segment in segments).strip()
+            except Exception as stream_err:
+                logger.info("In-memory audio stream decode fallback to tempfile: %s", stream_err)
+                if isinstance(file_to_transcribe, io.BytesIO):
+                    file_to_transcribe.seek(0)
+                    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as f:
+                        f.write(file_to_transcribe.read())
+                        temp_file_path = f.name
+                    segments, info = model.transcribe(
+                        temp_file_path,
+                        beam_size=1,
+                        language="en",
+                        vad_filter=True,
+                        vad_parameters=dict(min_silence_duration_ms=500)
+                    )
+                    transcription = " ".join(segment.text.strip() for segment in segments).strip()
+                else:
+                    raise stream_err
             logger.info("Whisper transcribed %d chars from audio (detected lang: %s, prob: %.2f)",
                         len(transcription), info.language, info.language_probability)
             return transcription

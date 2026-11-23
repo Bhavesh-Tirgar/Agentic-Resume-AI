@@ -158,16 +158,27 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
             let minY = h;
             let maxY = 0;
 
-            // Sample every 4th pixel for high-performance sub-millisecond execution
-            for (let y = 0; y < h; y += 4) {
+            // Illumination-invariant normalized chromaticity filter with geometric head prior
+            const maxYBound = h * 0.72; // Exclude shirts/desks in lower quadrant
+            for (let y = 0; y < maxYBound; y += 4) {
               for (let x = 0; x < w; x += 4) {
                 const idx = (y * w + x) * 4;
                 const r = data[idx];
                 const g = data[idx + 1];
                 const b = data[idx + 2];
 
-                // YCbCr / RGB skin tone bounding filter
-                if (r > 65 && g > 45 && b > 25 && (r - g) > 10 && (r - b) > 10 && r > g && r > b) {
+                const totalIntensity = r + g + b + 0.001;
+                const normR = r / totalIntensity;
+                const normG = g / totalIntensity;
+
+                // Human skin tone in normalized chromaticity (invariant to room warm/cool lighting)
+                const isSkinChromaticity = (
+                  normR > 0.33 && normR < 0.52 &&
+                  normG > 0.26 && normG < 0.38 &&
+                  r > 40 && (r - g) > 6 && (r - b) > 6
+                );
+
+                if (isSkinChromaticity) {
                   skinPixelCount++;
                   sumX += x;
                   sumY += y;

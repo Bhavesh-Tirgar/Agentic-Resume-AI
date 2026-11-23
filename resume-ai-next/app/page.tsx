@@ -19,8 +19,8 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function Home() {
   const [currentTab, setCurrentTab] = useState<NavTab>("overview");
-  const [activeResumeId, setActiveResumeId] = useState<number>(1);
-  const [activeJobMatchId, setActiveJobMatchId] = useState<number>(1);
+  const [activeResumeId, setActiveResumeId] = useState<number | undefined>(undefined);
+  const [activeJobMatchId, setActiveJobMatchId] = useState<number | undefined>(undefined);
   const [prefilledJob, setPrefilledJob] = useState<{ title: string; description: string } | null>(null);
   const [initialScanFile, setInitialScanFile] = useState<File | null>(null);
 
