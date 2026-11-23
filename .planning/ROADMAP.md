@@ -52,6 +52,6 @@ Upgrade `Bhavesh-Tirgar/Agentic-Resume-AI` from a prototype into a high-performa
 
 ### Phase 7: Project J.A.R.V.I.S. — Sub-Second Full-Duplex Multimodal Interviewer (v3.0)
 - [x] M7.1: **Sub-Second Streaming Audio & Barge-In:** Fast single-hop voice dispatch, client-side Web Audio VAD with auto-submit on 1.8s pause, real-time audio level frequency meter, instant Barge-In interruption handling (yielding floor to candidate).
-- [ ] M7.2: **Client-Side MediaPipe Vision Telemetry (30 FPS):** Embed `@mediapipe/tasks-vision` Wasm in Next.js; calculate 3D Iris Gaze Vector, Eye Aspect Ratio (EAR), head pose (Yaw/Pitch/Roll), and rapid saccade reading detection.
+- [x] M7.2: **Client-Side Real-Time Vision Engine (HUD Overlay):** Sub-millisecond Canvas-based face tracking at 15-20 FPS, 3D Iris Gaze Vector, real measured Eye Contact %, Demeanor classification, live corner reticle bounding box, and horizontal saccade reading detection.
 - [ ] M7.3: **Audio-to-Viseme 3D Avatar Lip-Sync:** 16-band audio FFT to 52 ARKit blendshapes (`jawOpen`, `mouthPucker`, `mouthFunnel`, `browInnerUp`) with procedural micro-blinks and attentive head nods.
 - [ ] M7.4: **Distributed State & Enterprise Persistence:** Replace in-memory `InterviewSessionManager` with Redis cluster state + PostgreSQL audit event logging; Docker Compose orchestration.
