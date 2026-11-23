@@ -1,6 +1,7 @@
 from typing import TypedDict, List
 
 from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from AI.Agents.InterviewPlannerAgent import InterviewPlannerAgent
 from AI.Schemas.ResumeSchema import ResumeSchema
@@ -72,6 +73,9 @@ def validate_and_enrich_plan_node(state: InterviewPlanningState) -> dict:
     return {"interview_plan": plan}
 
 
+interview_planning_checkpointer = MemorySaver()
+
+
 def build_interview_planning_graph():
     graph = StateGraph(InterviewPlanningState)
 
@@ -85,7 +89,7 @@ def build_interview_planning_graph():
     graph.add_edge("plan_interview", "validate_and_enrich_plan")
     graph.add_edge("validate_and_enrich_plan", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=interview_planning_checkpointer)
 
 
 interview_planning_graph = build_interview_planning_graph()
@@ -98,6 +102,7 @@ def run_interview_planning_graph(
     job_match: JobMatchSchema,
     job_title: str,
     job_description: str = "",
+    thread_id: str = "default",
 ):
     return interview_planning_graph.invoke(
         {
@@ -107,5 +112,6 @@ def run_interview_planning_graph(
             "job_match": job_match,
             "job_title": job_title,
             "job_description": job_description,
-        }
+        },
+        config={"configurable": {"thread_id": thread_id or "default"}}
     )

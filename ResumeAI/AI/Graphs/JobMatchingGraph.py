@@ -1,6 +1,7 @@
 from typing import TypedDict, List
 
 from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from AI.Agents.JobMatchingAgent import JobMatchingAgent
 from AI.Schemas.ResumeSchema import ResumeSchema
@@ -81,6 +82,9 @@ def calibrate_match_node(state: JobMatchingState) -> dict:
     return {"match_result": result}
 
 
+job_matching_checkpointer = MemorySaver()
+
+
 def build_job_matching_graph():
     graph = StateGraph(JobMatchingState)
 
@@ -94,7 +98,7 @@ def build_job_matching_graph():
     graph.add_edge("match_job", "calibrate_match")
     graph.add_edge("calibrate_match", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=job_matching_checkpointer)
 
 
 job_matching_graph = build_job_matching_graph()
@@ -104,11 +108,13 @@ def run_job_matching_graph(
     resume: ResumeSchema,
     job_title: str,
     job_description: str = "",
+    thread_id: str = "default",
 ):
     return job_matching_graph.invoke(
         {
             "resume": resume,
             "job_title": job_title,
             "job_description": job_description,
-        }
+        },
+        config={"configurable": {"thread_id": thread_id or "default"}}
     )

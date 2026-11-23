@@ -1,6 +1,7 @@
 from typing import TypedDict
 
 from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from AI.Agents.ResumeParserAgent import ResumeParserAgent
 from AI.Agents.ResumeAnalysisAgent import ResumeAnalysisAgent
@@ -104,6 +105,9 @@ def score_resume_node(state: ResumeState) -> dict:
     }
 
 
+resume_checkpointer = MemorySaver()
+
+
 def build_resume_graph():
     graph = StateGraph(ResumeState)
 
@@ -129,17 +133,18 @@ def build_resume_graph():
     graph.add_edge("analyze_resume", "score_resume")
     graph.add_edge("score_resume", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=resume_checkpointer)
 
 
 # Compile once when the module loads
 resume_graph = build_resume_graph()
 
 
-def run_resume_graph(resume_text: str):
+def run_resume_graph(resume_text: str, thread_id: str = "default"):
     return resume_graph.invoke(
         {
             "resume_text": resume_text,
             "retry_count": 0,
-        }
+        },
+        config={"configurable": {"thread_id": thread_id or "default"}}
     )
