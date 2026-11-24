@@ -9,6 +9,7 @@ from AI.Models.JobDiscoveryResult import JobDiscoveryResult
 from AI.Schemas.ResumeSchema import ResumeSchema
 from AI.Schemas.JobDiscoverySchema import JobDiscoveryResponseSchema, DiscoveredJob
 from AI.Agents.JobDiscoveryAgent import JobDiscoveryAgent
+from AI.Utils.GeoCommuteEngine import GeoCommuteEngine
 
 logger = logging.getLogger(__name__)
 
@@ -391,7 +392,8 @@ class JobDiscoveryService:
     def discover_jobs(
         resume: Resume,
         location: str = "Remote / Nationwide",
-        work_type: str = "All"
+        work_type: str = "All",
+        radius_km: int = 25
     ) -> JobDiscoveryResult:
         if resume is None:
             raise ValueError("Resume cannot be None.")
@@ -447,6 +449,25 @@ class JobDiscoveryService:
                     location=effective_location,
                     work_type=work_type,
                 )
+
+        # Enrich discovered jobs with CareerPilot coordinates and commute calculations
+        cand_coords = GeoCommuteEngine.geocode_location(effective_location)
+        enriched_jobs = []
+        for idx, job in enumerate(discovery_result.jobs):
+            job_dict = job.model_dump()
+            enriched_dict = GeoCommuteEngine.enrich_job_with_geo(
+                job_dict=job_dict,
+                candidate_coords=cand_coords,
+                index=idx,
+                radius_km=radius_km
+            )
+            enriched_jobs.append(DiscoveredJob(**enriched_dict))
+
+        discovery_result.candidate_latitude = cand_coords[0]
+        discovery_result.candidate_longitude = cand_coords[1]
+        discovery_result.radius_km = radius_km
+        discovery_result.jobs = enriched_jobs
+        discovery_result.total_jobs_found = len(enriched_jobs)
 
         saved = JobDiscoveryResult.objects.create(
             resume=resume,

@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowRight, Menu, X, Sun, Moon, Sparkles } from "lucide-react";
+import { ArrowRight, Menu, X, Sun, Moon, Sparkles, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTheme } from "../ThemeProvider";
+import { PrivacyModal } from "../PrivacyModal";
 
 export type NavTab = "overview" | "studio" | "matcher" | "scout" | "interview";
 
@@ -16,6 +17,7 @@ interface NavbarProps {
 export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -115,6 +117,16 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
 
         {/* Action Controls: Theme Toggle & Launch Button */}
         <div className="flex items-center gap-2">
+          {/* DPDP / GDPR Privacy Sovereignty Button */}
+          <button
+            onClick={() => setPrivacyOpen(true)}
+            aria-label="Data Privacy & Sovereignty"
+            className="p-1.5 rounded-full text-slate-600 dark:text-zinc-400 hover:text-emerald-500 hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/20 transition cursor-pointer"
+            title="Data Privacy & Portability (DPDP / GDPR)"
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+          </button>
+
           {/* Light / Dark Mode Toggle */}
           <button
             onClick={toggleTheme}
@@ -208,6 +220,17 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
             Interview Prep
           </button>
 
+          <button
+            onClick={() => {
+              setPrivacyOpen(true);
+              setMobileMenuOpen(false);
+            }}
+            className="text-left px-3 py-2 rounded-lg text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition cursor-pointer"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Data Privacy (DPDP / GDPR)</span>
+          </button>
+
           <div className="pt-2 border-t border-slate-100 dark:border-[#1e2330] flex items-center justify-between">
             <span className="text-xs text-slate-500 dark:text-zinc-400">Appearance</span>
             <button
@@ -220,6 +243,9 @@ export function Navbar({ currentTab, onTabChange, onUploadClick }: NavbarProps) 
           </div>
         </div>
       )}
+
+      {/* Global DPDP / GDPR Privacy Sovereignty Dialog */}
+      <PrivacyModal isOpen={privacyOpen} onClose={() => setPrivacyOpen(false)} />
     </header>
   );
 }

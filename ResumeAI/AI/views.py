@@ -268,7 +268,8 @@ class JobDiscoveryView(APIView):
                 latest = JobDiscoveryService.discover_jobs(
                     resume=resume,
                     location="Remote / Nationwide",
-                    work_type="All"
+                    work_type="All",
+                    radius_km=25
                 )
             except Exception as exc:
                 return Response(
@@ -291,12 +292,18 @@ class JobDiscoveryView(APIView):
         resume = get_user_resume_or_default(request.user, resume_id)
         location = request.data.get("location", "Remote / Nationwide")
         work_type = request.data.get("work_type", "All")
+        raw_radius = request.data.get("radius_km") or request.data.get("radius", 25)
+        try:
+            radius_km = int(raw_radius)
+        except (ValueError, TypeError):
+            radius_km = 25
 
         try:
             result = JobDiscoveryService.discover_jobs(
                 resume=resume,
                 location=location,
-                work_type=work_type
+                work_type=work_type,
+                radius_km=radius_km
             )
         except ValueError as exc:
             return Response(

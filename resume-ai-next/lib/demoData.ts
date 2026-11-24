@@ -320,6 +320,11 @@ export interface DiscoveredJobItem {
   location: string;
   work_type: string;
   distance_commute: string;
+  distance_km?: number;
+  commute_time_transit?: string;
+  commute_time_driving?: string;
+  latitude?: number;
+  longitude?: number;
   match_percentage: number;
   salary_range: string;
   experience_required: string;
@@ -332,6 +337,9 @@ export interface DiscoveredJobItem {
 
 export interface JobDiscoveryData {
   candidate_location: string;
+  candidate_latitude?: number;
+  candidate_longitude?: number;
+  radius_km?: number;
   total_jobs_found: number;
   jobs: DiscoveredJobItem[];
   search_summary: string;

@@ -324,7 +324,8 @@ export const setActiveResumeId = (id: number) => {
 export async function discoverJobsApi(
   resumeId: number,
   location: string = "Remote / Nationwide",
-  workType: string = "All"
+  workType: string = "All",
+  radiusKm: number = 25
 ): Promise<{
   message: string;
   discovery_id: number;
@@ -337,6 +338,7 @@ export async function discoverJobsApi(
     body: JSON.stringify({
       location,
       work_type: workType,
+      radius_km: radiusKm,
     }),
   });
 
@@ -536,6 +538,46 @@ export async function getVirtualHRHistoryApi(): Promise<{
     throw new Error("Failed to load interview history");
   }
 
+  return res.json();
+}
+
+// 11. India DPDP Act & EU GDPR Privacy Compliance APIs
+export async function exportUserDataApi(): Promise<Blob> {
+  const token = await acquireFreshToken();
+  const res = await fetch(`${API_BASE}/auth/privacy/export-data/`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to export user data archive");
+  }
+
+  return res.blob();
+}
+
+export async function deleteAccountApi(): Promise<{
+  message: string;
+  deleted_username: string;
+  shredded_physical_files: number;
+  status: string;
+}> {
+  const res = await fetchWithAuth("/auth/privacy/delete-account/", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to erase account");
+  }
+
+  removeAuthToken();
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("resume_ai_guest_creds");
+  }
   return res.json();
 }
 
