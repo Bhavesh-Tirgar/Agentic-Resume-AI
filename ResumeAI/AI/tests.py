@@ -359,3 +359,63 @@ class AITests(TestCase):
         self.assertEqual(res.data["top_unlock_skill"], "docker")
         self.assertGreater(len(res.data["ranked_gaps"]), 0)
 
+    def test_virtual_hr_profanity_boundary_and_seniority(self):
+        from AI.Services.VirtualHRService import VirtualHRService
+        vhr = VirtualHRService()
+
+        # 1. Word with substring like 'predict' (contains 'dick') should NOT trigger profanity
+        res_benign = vhr._fallback_turn_evaluation(
+            answer="I can predict system load and contradiction in distributed transactions with high precision.",
+            current_round=1,
+            max_rounds=4
+        )
+        self.assertNotEqual(res_benign.adaptive_hr_tone, "Firm / Serious")
+        self.assertGreater(res_benign.star_score, 20)
+
+        # 2. Actual standalone profanity should trigger firm boundary
+        res_profane = vhr._fallback_turn_evaluation(
+            answer="This fucking codebase is broken.",
+            current_round=1,
+            max_rounds=4
+        )
+        self.assertEqual(res_profane.adaptive_hr_tone, "Firm / Serious")
+        self.assertEqual(res_profane.star_score, 5)
+
+        # 3. Brief shrug ("don't know") should be handled as learning opportunity, not code copier
+        res_shrug = vhr._fallback_turn_evaluation(
+            answer="I don't know.",
+            current_round=1,
+            max_rounds=4
+        )
+        self.assertEqual(res_shrug.adaptive_hr_tone, "Encouraging / Socratic")
+        self.assertIn("first principles", res_shrug.hr_followup_or_next_question.lower())
+
+    def test_geocommute_international_hubs_and_jitter(self):
+        from AI.Utils.GeoCommuteEngine import GeoCommuteEngine
+        
+        # Geocode international hubs
+        tokyo_coords = GeoCommuteEngine.geocode_location("Tokyo, Japan")
+        self.assertAlmostEqual(tokyo_coords[0], 35.6762, places=2)
+        self.assertAlmostEqual(tokyo_coords[1], 139.6503, places=2)
+
+        zurich_coords = GeoCommuteEngine.geocode_location("Zurich, Switzerland")
+        self.assertAlmostEqual(zurich_coords[0], 47.3769, places=2)
+
+        dubai_coords = GeoCommuteEngine.geocode_location("Downtown Dubai, UAE")
+        self.assertAlmostEqual(dubai_coords[0], 25.2048, places=2)
+
+        # Distance & commute estimation
+        dist = GeoCommuteEngine.haversine_distance_km(12.9716, 77.5946, 12.9352, 77.6245)
+        self.assertGreater(dist, 0)
+        self.assertLess(dist, 10.0)
+
+        commute = GeoCommuteEngine.estimate_commute(dist)
+        self.assertIn("min via Metro", commute["transit"])
+        self.assertIn("driving", commute["driving"])
+
+    def test_realvoice_lru_caching(self):
+        from AI.Services.RealVoiceService import RealVoiceService, _VOICE_CACHE
+
+        _VOICE_CACHE["en-US-ChristopherNeural:Test phrase 1"] = "data:audio/mp3;base64,mockdata1"
+        res = RealVoiceService.synthesize_to_base64("Test phrase 1")
+        self.assertEqual(res, "data:audio/mp3;base64,mockdata1")

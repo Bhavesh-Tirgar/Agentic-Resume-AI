@@ -39,6 +39,16 @@ CITY_CENTROIDS: Dict[str, Tuple[float, float]] = {
     "singapore": (1.3521, 103.8198),
     "sydney": (-33.8688, 151.2093),
     "toronto": (43.6532, -79.3832),
+    "zurich": (47.3769, 8.5417),
+    "tokyo": (35.6762, 139.6503),
+    "dublin": (53.3498, -6.2603),
+    "dubai": (25.2048, 55.2708),
+    "auckland": (-36.8485, 174.7633),
+    "cape town": (-33.9249, 18.4241),
+    "johannesburg": (-26.2041, 28.0473),
+    "sao paulo": (-23.5505, -46.6333),
+    "tel aviv": (32.0853, 34.7818),
+    "stockholm": (59.3293, 18.0686),
 }
 
 
@@ -129,10 +139,12 @@ class GeoCommuteEngine:
             job_dict["distance_commute"] = "100% Remote / Anywhere"
             return job_dict
 
-        # Deterministic radial offset around candidate centroid:
-        # Distance steps: 2.4km, 4.8km, 7.2km, 11.5km, etc. capped under radius_km
-        angle = (index * 72.0 + 25.0) * (math.pi / 180.0)
-        target_dist = min(radius_km * 0.85, max(1.8, 2.2 * (index + 1)))
+        # Natural deterministic radial offset & corridor distribution
+        seed_val = int(hashlib.md5((job_dict.get("company", "") + job_dict.get("title", "") + str(index)).encode()).hexdigest()[:6], 16)
+        jitter_angle = (seed_val % 50) - 25.0  # +/- 25 degrees
+        jitter_dist = ((seed_val // 50) % 15) / 10.0 - 0.75  # +/- 0.75 km
+        angle = ((index * 72.0 + 25.0 + jitter_angle) % 360.0) * (math.pi / 180.0)
+        target_dist = max(1.2, min(radius_km * 0.88, (1.9 * (index + 1)) + jitter_dist))
         
         # 1 deg latitude ~ 111 km, 1 deg longitude ~ 111 * cos(lat) km
         deg_lat = target_dist * math.cos(angle) / 111.0

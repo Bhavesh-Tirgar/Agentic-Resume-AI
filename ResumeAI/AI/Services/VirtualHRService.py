@@ -1,3 +1,4 @@
+import re
 import logging
 import time
 from typing import Any, Dict, Optional
@@ -144,10 +145,23 @@ class VirtualHRService:
         # Candidate summary from resume or dynamic session context
         candidate_summary = session.get("candidate_summary") or f"Applying for {target_role}"
         ans_lower = candidate_answer.lower()
-        if any(w in ans_lower for w in ["fresher", "intern", "college", "student", "beginner", "just graduated", "final year", "3rd year", "4th year"]):
-            candidate_summary += " | SENIORITY: Junior / Fresher / Student. Calibrate questions to fundamentals, core algorithms, and personal projects. Be conversational, supportive, and provide hints if they get stuck."
-        elif any(w in ans_lower for w in ["senior", "lead", "architect", "principal", "staff", "10 years", "8 years", "7 years"]):
+        is_explicit_senior = any(
+            re.search(r'\b' + re.escape(w) + r'\b', ans_lower)
+            for w in ["senior", "lead", "architect", "principal", "staff", "10 years", "8 years", "7 years", "director", "manager", "staff engineer", "tech lead"]
+        )
+        mentorship_present = any(
+            re.search(r'\b' + re.escape(w) + r'\b', ans_lower)
+            for w in ["mentored", "mentoring", "coached", "supervised", "managed", "leading", "delegated"]
+        )
+        is_explicit_junior = any(
+            re.search(r'\b' + re.escape(w) + r'\b', ans_lower)
+            for w in ["i am a fresher", "as a fresher", "fresher", "as an intern", "i was an intern", "i am an intern", "college student", "just graduated", "final year", "3rd year", "4th year", "beginner"]
+        )
+
+        if is_explicit_senior or (mentorship_present and not is_explicit_junior):
             candidate_summary += " | SENIORITY: Senior / Staff / Architect. Calibrate questions to distributed systems, scalability, trade-offs, and failure scenarios."
+        elif is_explicit_junior and not is_explicit_senior:
+            candidate_summary += " | SENIORITY: Junior / Fresher / Student. Calibrate questions to fundamentals, core algorithms, and personal projects. Be conversational, supportive, and provide hints if they get stuck."
 
         prompt_text = VIRTUAL_HR_EVALUATION_PROMPT.format(
             candidate_name=candidate_name,
@@ -293,12 +307,25 @@ class VirtualHRService:
         vision_metrics: Optional[VisionTelemetry] = None
     ) -> InterviewTurnEvaluation:
         ans_lower = answer.lower()
-        PROFANITY_WORDS = ["fuck", "shit", "bitch", "asshole", "dick", "damn", "f**k", "cunt"]
-        has_profanity = any(w in ans_lower for w in PROFANITY_WORDS)
+        PROFANITY_PATTERNS = [
+            r'\bfuck[a-z]*\b',
+            r'\bshit[a-z]*\b',
+            r'\bbitch[a-z]*\b',
+            r'\basshole[a-z]*\b',
+            r'\bdick[s]?\b',
+            r'\bdamn[a-z]*\b',
+            r'\bcunt[s]?\b',
+            r'f\*\*k'
+        ]
+        has_profanity = any(re.search(pat, ans_lower) for pat in PROFANITY_PATTERNS)
 
-        is_copied = any(phrase in ans_lower for phrase in ["just copy", "i copy", "didn't make", "didnt make", "don't know", "dont know", "no idea"])
+        COPIED_PHRASES = ["just copy", "i copy", "copied from stack", "copy pasted", "didn't make it", "didnt make it"]
+        is_copied = any(phrase in ans_lower for phrase in COPIED_PHRASES)
+
+        SHRUG_PHRASES = ["don't know", "dont know", "no idea", "dunno", "not sure"]
         words = answer.strip().split()
         word_count = len(words)
+        is_brief_shrug = any(phrase in ans_lower for phrase in SHRUG_PHRASES) and word_count <= 8
 
         is_camera_off = (
             not vision_metrics or 
@@ -346,6 +373,22 @@ class VirtualHRService:
                 vision=vision_metrics
             )
 
+        # Case 2.5: Brief Unelaborated Shrug ("don't know")
+        if is_brief_shrug:
+            cam_note = " Also, feel free to turn your video on if possible." if is_camera_off else ""
+            return InterviewTurnEvaluation(
+                star_score=35,
+                clarity_score=40,
+                strengths=["Humility in acknowledging knowledge limits"],
+                critique="When you encounter an unfamiliar concept in an interview, don't just stop at 'I don't know'. Talk through what adjacent concepts you do understand, or how you would investigate the problem.",
+                behavioral_critique=behavioral_critique,
+                adaptive_hr_tone="Encouraging / Socratic",
+                hr_followup_or_next_question=f"It's completely fine not to know every technology off the top of your head. If you were faced with this problem in production, what first principles or debugging tools would you use to figure it out?{cam_note}",
+                question_category="Problem Solving & Adaptability",
+                is_final_round=current_round >= max_rounds,
+                vision=vision_metrics
+            )
+
         # Case 3: One-Word / Low-Effort Answer
         if word_count <= 3:
             cam_note = " Also, try turning on your video so we can connect face-to-face." if is_camera_off else ""
@@ -366,7 +409,8 @@ class VirtualHRService:
         has_metrics = any(char.isdigit() for char in answer)
         star_score = min(92, max(60, 65 + (15 if has_metrics else 0) + (10 if word_count > 40 else 0)))
         clarity_score = 85 if word_count >= 30 else 70
-        is_junior = any(k in ans_lower for k in ["fresher", "intern", "college", "student", "beginner", "just graduated", "final year", "3rd year", "4th year"])
+        is_senior = any(re.search(r'\b' + re.escape(w) + r'\b', ans_lower) for w in ["senior", "lead", "architect", "principal", "staff", "10 years", "8 years", "7 years"])
+        is_junior = not is_senior and any(re.search(r'\b' + re.escape(k) + r'\b', ans_lower) for k in ["fresher", "junior", "college student", "student", "beginner", "just graduated", "final year", "3rd year", "4th year"])
 
         if is_camera_off:
             next_q = "Got it, that makes sense. By the way, if you can turn your camera on, it helps a lot to see each other. Tell me about a time when you faced a difficult technical bottleneck on that project?"

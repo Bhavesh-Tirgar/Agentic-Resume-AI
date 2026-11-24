@@ -31,7 +31,7 @@ load_dotenv()
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv(
     "SECRET_KEY", 
-    "django-insecure-k!5)eq(&^-a_p7@yswh4-bl7l2&h-i8$c2#7yfqx-_vm2szbqh"
+    "careerpilot-sec-vault-4f81c9a0b3e7d21658e3-insecure-dev-only"
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -39,7 +39,7 @@ DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = [
     h.strip() 
-    for h in os.getenv("ALLOWED_HOSTS", "*").split(",") 
+    for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0,testserver").split(",") 
     if h.strip()
 ]
 
@@ -177,7 +177,7 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-CORS_ALLOW_ALL_ORIGINS = DEBUG
+CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", str(DEBUG)).lower() in ("true", "1", "yes")
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -186,6 +186,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
 ]
+
+CORS_ALLOW_CREDENTIALS = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
