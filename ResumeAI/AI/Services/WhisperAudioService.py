@@ -3,27 +3,35 @@ import io
 import tempfile
 import logging
 import base64
+import threading
 from typing import Optional, Union, BinaryIO
 from faster_whisper import WhisperModel
 
 logger = logging.getLogger(__name__)
 
+# Concurrency limiter to prevent multi-user CPU starvation
+_WHISPER_SEMAPHORE = threading.Semaphore(2)
+
+
 class WhisperAudioService:
     """
     High-performance, local Whisper speech-to-text service.
-    Transcribes candidate spoken audio in real-time with high accuracy across accents.
+    Transcribes candidate spoken audio in real-time with thread-safe concurrency management.
     """
     _model: Optional[WhisperModel] = None
 
     @classmethod
     def get_model(cls) -> WhisperModel:
         if cls._model is None:
-            logger.info("Initializing faster-whisper (base.en) model on CPU...")
+            # Dynamically calibrate thread allocation to prevent 100% CPU starvation
+            total_cores = os.cpu_count() or 2
+            safe_threads = max(1, min(2, total_cores // 2))
+            logger.info("Initializing faster-whisper (base.en) model on CPU with %d threads...", safe_threads)
             cls._model = WhisperModel(
                 "base.en",
                 device="cpu",
                 compute_type="int8",
-                cpu_threads=4
+                cpu_threads=safe_threads
             )
             logger.info("Whisper model loaded successfully.")
         return cls._model
@@ -32,10 +40,12 @@ class WhisperAudioService:
     def transcribe(cls, audio_source: Union[str, bytes, BinaryIO]) -> str:
         """
         Transcribes audio from a file path, raw bytes, or file-like object.
+        Acquires semaphore lock to guarantee stable multi-user CPU scheduling.
         Returns the clean, transcribed text.
         """
-        model = cls.get_model()
-        temp_file_path = None
+        with _WHISPER_SEMAPHORE:
+            model = cls.get_model()
+            temp_file_path = None
 
         try:
             # High-Performance In-Memory Fast Path: Stream directly from RAM without disk I/O

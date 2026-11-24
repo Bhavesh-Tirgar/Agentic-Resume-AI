@@ -171,11 +171,11 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
                 const normR = r / totalIntensity;
                 const normG = g / totalIntensity;
 
-                // Human skin tone in normalized chromaticity (invariant to room warm/cool lighting)
+                // Inclusive human skin tone in normalized chromaticity across diverse complexions and ambient lighting
                 const isSkinChromaticity = (
-                  normR > 0.33 && normR < 0.52 &&
-                  normG > 0.26 && normG < 0.38 &&
-                  r > 40 && (r - g) > 6 && (r - b) > 6
+                  normR > 0.30 && normR < 0.58 &&
+                  normG > 0.22 && normG < 0.40 &&
+                  r > 35 && (r - b) > 4
                 );
 
                 if (isSkinChromaticity) {
@@ -261,10 +261,17 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
               const calculatedConfidence = Math.round(Math.max(30, Math.min(92, 85 - centerDist * 60 - jitter * 2)));
               const calculatedNervousness = Math.round(Math.max(10, Math.min(85, 15 + jitter * 6 + (isReading ? 30 : 0))));
 
+              // Exponential Moving Average (EMA) smoothing to prevent visual number jitter
+              const prevEye = telemetryRef.current.eye_contact_percentage || calculatedEyeContact;
+              const smoothedEyeContact = Math.round(prevEye * 0.7 + calculatedEyeContact * 0.3);
+
+              const prevConf = telemetryRef.current.confidence_score || calculatedConfidence;
+              const smoothedConfidence = Math.round(prevConf * 0.7 + calculatedConfidence * 0.3);
+
               const updatedTelemetry: LiveVisionTelemetry = {
                 camera_active: true,
-                eye_contact_percentage: calculatedEyeContact,
-                confidence_score: calculatedConfidence,
+                eye_contact_percentage: smoothedEyeContact,
+                confidence_score: smoothedConfidence,
                 nervousness_score: calculatedNervousness,
                 gaze_direction: calculatedGaze,
                 facial_demeanor: calculatedDemeanor,
@@ -413,11 +420,11 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
               </div>
             )}
 
-            {/* Anti-Cheat Reading Alert Banner */}
+            {/* Presence Coaching Alert Banner */}
             {telemetry.is_reading_script && (
               <div className="absolute top-12 inset-x-4 z-20 flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-mono backdrop-blur-md animate-pulse">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                <span>Reading Sweep Detected — Maintain natural eye contact</span>
+                <span>Camera Alignment: Look toward the lens for maximum eye contact rating</span>
               </div>
             )}
 

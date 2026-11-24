@@ -41,32 +41,42 @@ def resolve_country_code(location: str) -> str:
     if not location:
         return "in"
     loc = location.lower()
-    if any(k in loc for k in ["usa", "united states", "new york", "san francisco", "seattle", "chicago", "austin", "boston", "california", "texas"]):
+    if any(k in loc for k in ["usa", "united states", "america", "new york", "san francisco", "seattle", "chicago", "austin", "boston", "california", "texas"]):
         return "us"
-    if any(k in loc for k in ["uk", "london", "manchester", "united kingdom", "england", "scotland", "edinburgh"]):
+    if any(k in loc for k in ["uk", "london", "manchester", "united kingdom", "england", "scotland", "edinburgh", "birmingham"]):
         return "gb"
-    if any(k in loc for k in ["germany", "deutschland", "berlin", "munich", "münchen", "frankfurt", "hamburg"]):
+    if any(k in loc for k in ["germany", "deutschland", "berlin", "munich", "münchen", "frankfurt", "hamburg", "cologne"]):
         return "de"
-    if any(k in loc for k in ["france", "paris", "lyon", "marseille"]):
+    if any(k in loc for k in ["france", "paris", "lyon", "marseille", "toulouse"]):
         return "fr"
-    if any(k in loc for k in ["netherlands", "amsterdam", "rotterdam", "utrecht"]):
+    if any(k in loc for k in ["netherlands", "amsterdam", "rotterdam", "utrecht", "hague"]):
         return "nl"
-    if any(k in loc for k in ["canada", "toronto", "vancouver", "montreal", "ottawa"]):
+    if any(k in loc for k in ["canada", "toronto", "vancouver", "montreal", "ottawa", "calgary"]):
         return "ca"
-    if any(k in loc for k in ["australia", "sydney", "melbourne", "brisbane"]):
+    if any(k in loc for k in ["australia", "sydney", "melbourne", "brisbane", "perth", "adelaide"]):
         return "au"
     if any(k in loc for k in ["poland", "warsaw", "krakow", "wroclaw"]):
         return "pl"
-    if any(k in loc for k in ["italy", "rome", "milan", "milano"]):
+    if any(k in loc for k in ["italy", "rome", "milan", "milano", "turin"]):
         return "it"
-    if any(k in loc for k in ["spain", "madrid", "barcelona", "valencia"]):
+    if any(k in loc for k in ["spain", "madrid", "barcelona", "valencia", "seville"]):
         return "es"
     if any(k in loc for k in ["singapore"]):
         return "sg"
-    if any(k in loc for k in ["south africa", "cape town", "johannesburg"]):
+    if any(k in loc for k in ["ireland", "dublin", "cork", "galway"]):
+        return "ie"
+    if any(k in loc for k in ["new zealand", "auckland", "wellington", "christchurch"]):
+        return "nz"
+    if any(k in loc for k in ["south africa", "cape town", "johannesburg", "durban"]):
         return "za"
-    if any(k in loc for k in ["brazil", "sao paulo", "rio"]):
+    if any(k in loc for k in ["brazil", "sao paulo", "rio", "brasil"]):
         return "br"
+    if any(k in loc for k in ["japan", "tokyo", "osaka", "kyoto"]):
+        return "us"  # Fallback to global US board if regional API lacks jp
+    if any(k in loc for k in ["dubai", "uae", "emirates", "abu dhabi"]):
+        return "gb"  # Adzuna ME corridor routed via global international feed
+    if any(k in loc for k in ["india", "ahmedabad", "bangalore", "bengaluru", "delhi", "mumbai", "hyderabad", "pune", "chennai", "kolkata", "noida", "gurgaon"]):
+        return "in"
     return "in"
 
 
