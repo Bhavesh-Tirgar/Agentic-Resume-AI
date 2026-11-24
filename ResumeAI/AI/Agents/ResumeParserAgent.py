@@ -1,6 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate
 from AI.Utils.TokenCounter import TokenCounter
 from AI.Utils.PIIScrubber import PIIScrubber
+from AI.Utils.PromptInjectionGuardrail import PromptInjectionGuardrail
 from AI.Services.GeminiService import GeminiService
 from AI.Prompts.ResumeParserPrompt import RESUME_PARSER_PROMPT
 from AI.Schemas.ResumeSchema import ResumeSchema
@@ -51,7 +52,7 @@ class ResumeParserAgent:
 
         result = self.chain.invoke(
             {
-                "resume_text": PIIScrubber.redact(resume_text)[0]
+                "resume_text": PromptInjectionGuardrail.wrap_delimited_corpus(PIIScrubber.redact(resume_text)[0], tag_name="untrusted_candidate_resume")
             },
             config={
                     "callbacks": [token_counter]

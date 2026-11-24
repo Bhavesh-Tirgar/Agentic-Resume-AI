@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { 
   Target, CheckCircle2, AlertCircle, ArrowRight, 
-  Layers, FileText, Check, Sparkles, RefreshCw, HelpCircle, Server, Copy
+  Layers, FileText, Check, Sparkles, RefreshCw, HelpCircle, Server, Copy,
+  ShieldAlert, BookOpen, Clock, ArrowUpRight
 } from "lucide-react";
 import { JOB_ROLES_PRESETS, DEMO_JOB_MATCH_RESULT } from "@/lib/demoData";
 import { matchJobApi, getActiveResumeId, getResumeProcessResultApi } from "@/lib/api";
@@ -27,7 +28,7 @@ export function JobMatchStudio({
   const [jobTitle, setJobTitle] = useState(initialJobTitle || JOB_ROLES_PRESETS[0].title);
   const [jobDescription, setJobDescription] = useState(initialJobDescription || JOB_ROLES_PRESETS[0].description);
   const [isMatching, setIsMatching] = useState(false);
-  const [matchResult, setMatchResult] = useState(DEMO_JOB_MATCH_RESULT);
+  const [matchResult, setMatchResult] = useState<any>(DEMO_JOB_MATCH_RESULT);
   const [apiNotice, setApiNotice] = useState<string | null>(null);
   const [activeMatchId, setActiveMatchId] = useState<number>(1);
   const [candidateInfo, setCandidateInfo] = useState<{ name: string; skillsCount: number } | null>(null);
@@ -59,7 +60,7 @@ export function JobMatchStudio({
   }, [activeResumeId]);
 
   const handleCopySummary = () => {
-    const summary = `Job Alignment Report for "${jobTitle}":\nOverall Match: ${matchResult.overall_match_score}%\nSkill Match: ${matchResult.skill_match_score}%\nMatched Skills: ${matchResult.matched_skills.join(", ")}\nMissing Skills: ${matchResult.missing_skills.join(", ")}\nRecommendations:\n${matchResult.recommendations.map(r => "- " + r).join("\n")}`;
+    const summary = `CareerPilot Job Alignment Report for "${jobTitle}":\nOverall Match: ${matchResult.overall_match_score}%\nSkill Match: ${matchResult.skill_match_score}%\nWhy It Matches: ${matchResult.why_matches || "Strong core competency overlap"}\nWhat Blocks: ${matchResult.what_blocks || "None"}\nRecommendations:\n${(matchResult.recommendations || []).map((r: string) => "- " + r).join("\n")}`;
     navigator.clipboard.writeText(summary);
     setCopiedSummary(true);
     setTimeout(() => setCopiedSummary(false), 2000);
@@ -94,6 +95,11 @@ export function JobMatchStudio({
         matched_skills: m.matched_skills?.length ? m.matched_skills : DEMO_JOB_MATCH_RESULT.matched_skills,
         missing_skills: m.missing_skills?.length ? m.missing_skills : DEMO_JOB_MATCH_RESULT.missing_skills,
         recommendations: m.recommendations?.length ? m.recommendations : DEMO_JOB_MATCH_RESULT.recommendations,
+        matched_evidence: m.matched_evidence?.length ? m.matched_evidence : (DEMO_JOB_MATCH_RESULT as any).matched_evidence,
+        adjacent_matches: m.adjacent_matches?.length ? m.adjacent_matches : (DEMO_JOB_MATCH_RESULT as any).adjacent_matches,
+        structured_gaps: m.structured_gaps?.length ? m.structured_gaps : (DEMO_JOB_MATCH_RESULT as any).structured_gaps,
+        why_matches: m.why_matches || (DEMO_JOB_MATCH_RESULT as any).why_matches,
+        what_blocks: m.what_blocks || (DEMO_JOB_MATCH_RESULT as any).what_blocks,
       });
       setApiNotice(`Live API Result: Evaluated against "${jobTitle}" via Django Backend (Match ID #${res.job_match_id})`);
     } catch (err: any) {
@@ -105,6 +111,11 @@ export function JobMatchStudio({
     }
   };
 
+  const isHardCapped = matchResult.overall_match_score <= 70 && (
+    matchResult.what_blocks?.toLowerCase().includes("capped at 70") ||
+    matchResult.what_blocks?.toLowerCase().includes("blocks qualification")
+  );
+
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8 space-y-6">
       {/* Title Header */}
@@ -113,10 +124,10 @@ export function JobMatchStudio({
           <div className="flex items-center gap-2">
             <Target className="w-4 h-4 text-emerald-500" />
             <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-              Role Benchmark Engine
+              CareerPilot 3-Tier Matcher
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-[#191d27] border border-slate-200 dark:border-[#272d3b] text-slate-600 dark:text-zinc-300">
-              Active Matcher
+              0.6*MustHave + 0.2*NiceToHave
             </span>
             {candidateInfo && (
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
@@ -125,10 +136,10 @@ export function JobMatchStudio({
             )}
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
-            Job Match & Gap Analysis
+            Job Match & Skill Gap Diagnostics
           </h1>
           <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-            Compare your resume against any job description to discover matching skills, identify missing keywords, and get tailored recommendations.
+            Evaluates exact competencies, grants 0.6 partial credit for transferable adjacent stacks, and generates weekend bridge projects.
           </p>
         </div>
 
@@ -200,7 +211,7 @@ export function JobMatchStudio({
 
           <div>
             <label className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider block mb-1.5">
-              Requirements & Description
+              Job Requirements & Specification
             </label>
             <textarea
               rows={12}
@@ -218,38 +229,48 @@ export function JobMatchStudio({
             {isMatching ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Computing Semantic Similarity via Backend...</span>
+                <span>Running CareerPilot 3-Tier Match...</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Run Gap Analysis & Match (Backend API)</span>
+                <span>Evaluate Compatibility & Gaps</span>
               </>
             )}
           </button>
         </div>
 
         {/* Right Column: Match Analysis & Missing Keywords */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="lg:col-span-7 space-y-5">
           
-          {/* Top Score Matrix */}
-          <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+          {/* Executive CareerPilot Alignment Banner */}
+          <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
               <span className="text-xs font-mono uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                Match Diagnostics
+                CareerPilot Diagnostic Overview
               </span>
-              <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                High Alignment
-              </span>
+              {isHardCapped ? (
+                <span className="text-[11px] font-mono text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 flex items-center gap-1">
+                  <ShieldAlert className="w-3 h-3" />
+                  <span>Max-70 Hard Cap Active</span>
+                </span>
+              ) : (
+                <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  Calibrated Qualification
+                </span>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center mb-4">
+            {/* Score Matrix */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               <div className="p-3 rounded-lg bg-slate-50 dark:bg-[#0c0e13] border border-slate-100 dark:border-[#1a1e29]">
-                <p className="text-[10px] font-mono uppercase text-slate-400 dark:text-zinc-500">Overall</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">{matchResult.overall_match_score}%</p>
+                <p className="text-[10px] font-mono uppercase text-slate-400 dark:text-zinc-500">Overall Match</p>
+                <p className={`text-2xl font-bold mt-0.5 ${isHardCapped ? "text-amber-500" : "text-emerald-500"}`}>
+                  {matchResult.overall_match_score}%
+                </p>
               </div>
               <div className="p-3 rounded-lg bg-slate-50 dark:bg-[#0c0e13] border border-slate-100 dark:border-[#1a1e29]">
-                <p className="text-[10px] font-mono uppercase text-slate-400 dark:text-zinc-500">Skills</p>
+                <p className="text-[10px] font-mono uppercase text-slate-400 dark:text-zinc-500">Skills Fit</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">{matchResult.skill_match_score}%</p>
               </div>
               <div className="p-3 rounded-lg bg-slate-50 dark:bg-[#0c0e13] border border-slate-100 dark:border-[#1a1e29]">
@@ -261,60 +282,106 @@ export function JobMatchStudio({
                 <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">{matchResult.education_match_score}%</p>
               </div>
             </div>
+
+            {/* Why it matches & What blocks */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-[#1e222d] text-xs">
+              {matchResult.why_matches && (
+                <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300">
+                  <span className="font-bold">Why You Match: </span>
+                  <span>{matchResult.why_matches}</span>
+                </div>
+              )}
+              {matchResult.what_blocks && (
+                <div className={`p-2.5 rounded-lg border text-xs ${
+                  isHardCapped 
+                    ? "bg-rose-500/10 border-rose-500/20 text-rose-800 dark:text-rose-300 font-semibold"
+                    : "bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-300"
+                }`}>
+                  <span className="font-bold">What Blocks Qualification: </span>
+                  <span>{matchResult.what_blocks}</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Matched vs Missing Keywords */}
+          {/* 3-Tier Breakdown: Exact Matches & Transferable Adjacent Stacks */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            {/* Matched Skills */}
+            {/* Matched Skills with Evidence */}
             <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 shadow-sm space-y-3">
-              <h3 className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Matched ATS Keywords ({matchResult.matched_skills.length})</span>
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Exact Matches ({matchResult.matched_skills.length})</span>
+                </span>
+                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">1.0x Weight</span>
               </h3>
               <div className="flex flex-wrap gap-1.5">
-                {matchResult.matched_skills.map((skill, idx) => (
-                  <span
-                    key={idx}
-                    className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[11px] font-mono flex items-center gap-1"
-                  >
-                    <Check className="w-3 h-3" />
-                    <span>{skill}</span>
-                  </span>
-                ))}
+                {matchResult.matched_skills.map((skill: string, idx: number) => {
+                  const ev = (matchResult.matched_evidence || []).find((e: any) => e.skill.toLowerCase() === skill.toLowerCase());
+                  const isStrong = ev?.evidence === "strong";
+                  return (
+                    <span
+                      key={idx}
+                      className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[11px] font-mono flex items-center gap-1"
+                      title={ev ? `${skill}: ${ev.evidence} evidence in ${ev.where}` : skill}
+                    >
+                      <Check className="w-3 h-3" />
+                      <span>{skill}</span>
+                      {isStrong && <span className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-300">Exp</span>}
+                    </span>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Missing Keywords */}
+            {/* Transferable Adjacent Stack (0.6x Credit) */}
             <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 shadow-sm space-y-3">
-              <h3 className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-                <span>Missing ATS Keywords ({matchResult.missing_skills.length})</span>
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-cyan-500" />
+                  <span>Adjacent Competencies</span>
+                </span>
+                <span className="text-[10px] font-mono text-cyan-600 dark:text-cyan-400">0.6x Credit</span>
               </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {matchResult.missing_skills.map((skill, idx) => (
-                  <span
-                    key={idx}
-                    className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px] font-mono flex items-center gap-1"
-                  >
-                    <span>{skill}</span>
-                  </span>
-                ))}
-              </div>
+              {matchResult.adjacent_matches?.length > 0 ? (
+                <div className="space-y-2">
+                  {matchResult.adjacent_matches.map((adj: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20 text-xs font-mono flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-1.5 text-slate-800 dark:text-zinc-200">
+                        <span className="font-semibold text-cyan-700 dark:text-cyan-300">{adj.you_have}</span>
+                        <span className="text-slate-400">&rarr;</span>
+                        <span className="text-slate-500">{adj.jd_wants}</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-700 dark:text-cyan-400">
+                        +{Math.round(adj.credit * 100)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 dark:text-zinc-500 italic">
+                  No adjacent skill substitutions required for this position.
+                </p>
+              )}
             </div>
 
           </div>
 
-          {/* Gap Mitigation Plan */}
+          {/* Actionable Gap Remediation Tasks (1-2 Weekends) */}
           <div className="rounded-xl border border-slate-200 dark:border-[#20242e] bg-white dark:bg-[#111318] p-5 shadow-sm space-y-3">
-            <h3 className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider">
-              Strategic Resume Adjustments For This Role
+            <h3 className="text-xs font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+              <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
+              <span>CareerPilot Action Tasks & Remediation Plan</span>
             </h3>
             <ul className="space-y-2 text-xs">
-              {matchResult.recommendations.map((rec, idx) => (
-                <li key={idx} className="flex items-start gap-2.5 text-slate-700 dark:text-zinc-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-900 dark:bg-white mt-1.5 shrink-0"></span>
-                  <span className="leading-relaxed">{rec}</span>
+              {(matchResult.recommendations || []).map((rec: string, idx: number) => (
+                <li key={idx} className="p-2.5 rounded-lg bg-slate-50 dark:bg-[#151821] border border-slate-200/80 dark:border-[#202533] flex items-start gap-2.5 text-slate-700 dark:text-zinc-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span>
+                  <span className="leading-relaxed font-mono text-[11px]">{rec}</span>
                 </li>
               ))}
             </ul>

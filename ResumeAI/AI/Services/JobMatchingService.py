@@ -5,10 +5,16 @@ from django.db import transaction
 from Resume.models import Resume
 from AI.Models.JobMatchResult import JobMatchResult
 from AI.Schemas.ResumeSchema import ResumeSchema
-from AI.Schemas.JobMatchSchema import JobMatchSchema
+from AI.Schemas.JobMatchSchema import (
+    JobMatchSchema,
+    MatchedSkillEvidence,
+    AdjacentSkillMatch,
+    CompetencyGap,
+)
 from AI.Graphs.JobMatchingGraph import run_job_matching_graph
 from AI.Utils.SemanticVectorMatcher import SemanticVectorMatcher
 from AI.Utils.SkillAliasTable import SkillAliasTable
+from AI.Utils.PromptInjectionGuardrail import PromptInjectionGuardrail
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +133,36 @@ def build_heuristic_job_match(resume_schema: ResumeSchema, job_title: str, job_d
     if missing_skills:
         weaknesses.append(f"Identified competency gap in '{missing_skills[0]}'.")
 
+    # Grounded evidence & CareerPilot structured models
+    matched_evidence = []
+    for skill in matched_skills:
+        if skill.lower() in experience_text:
+            matched_evidence.append(MatchedSkillEvidence(skill=skill, evidence="strong", where="Work Experience / Projects"))
+        else:
+            matched_evidence.append(MatchedSkillEvidence(skill=skill, evidence="listed_only", where="Skills Summary"))
+
+    adjacent_models = [
+        AdjacentSkillMatch(jd_wants=target, you_have=cand, credit=0.6)
+        for target, cand in adjacent_matches
+    ]
+
+    structured_gaps = []
+    for mh in must_haves:
+        if mh in missing_skills:
+            structured_gaps.append(CompetencyGap(skill=mh, type="must_have", impact="high"))
+    for nth in nice_to_haves:
+        if nth in missing_skills:
+            structured_gaps.append(CompetencyGap(skill=nth, type="nice_to_have", impact="low"))
+
+    why_matches = (
+        f"Verified coverage across {len(matched_skills)} core technical competencies grounded in candidate project history."
+        if matched_skills else "General software engineering principles align with target role."
+    )
+    what_blocks = (
+        f"Critical must-have competency '{must_haves[0]}' is absent from resume and blocks qualification (capped at 70)."
+        if has_critical_missing_must_have else "No critical blocking competency gaps detected."
+    )
+
     return JobMatchSchema(
         overall_match_score=overall_score,
         skill_match_score=skill_score,
@@ -141,7 +177,12 @@ def build_heuristic_job_match(resume_schema: ResumeSchema, job_title: str, job_d
         recommendations=action_items[:4] or [
             "Incorporate verified experience with target competencies into your core resume bullets.",
             "Elevate visibility of primary technical stack in the summary to boost ATS keyword indexing."
-        ]
+        ],
+        matched_evidence=matched_evidence,
+        adjacent_matches=adjacent_models,
+        structured_gaps=structured_gaps,
+        why_matches=why_matches,
+        what_blocks=what_blocks,
     )
 
 
@@ -183,12 +224,15 @@ class JobMatchingService:
                 parser_result = process_res["parser_result"]
                 resume_schema = ResumeSchema.model_validate(parser_result.parsed_data)
 
+        clean_title = PromptInjectionGuardrail.sanitize_untrusted_text(job_title.strip())
+        clean_desc = PromptInjectionGuardrail.sanitize_untrusted_text(job_description.strip() if job_description else "")
+
         # Run multi-node LangGraph execution with ReAct reflection
         try:
             result = run_job_matching_graph(
                 resume=resume_schema,
-                job_title=job_title.strip(),
-                job_description=(job_description.strip() if job_description else ""),
+                job_title=clean_title,
+                job_description=clean_desc,
                 thread_id=f"job_match_{resume.id}"
             )
             match_result = result.get("match_result")
@@ -197,12 +241,12 @@ class JobMatchingService:
             match_result = None
 
         if match_result is None:
-            match_result = build_heuristic_job_match(resume_schema, job_title, job_description)
+            match_result = build_heuristic_job_match(resume_schema, clean_title, clean_desc)
 
         saved_result = JobMatchResult.objects.create(
             resume=resume,
-            job_title=job_title,
-            job_description=(job_description.strip() if job_description else ""),
+            job_title=clean_title,
+            job_description=clean_desc,
             match_data=match_result.model_dump(),
         )
 

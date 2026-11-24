@@ -263,7 +263,22 @@ export const DEMO_JOB_MATCH_RESULT = {
     "Highlight specific cost-reduction percentages in your most recent experience section to showcase bottom-line impact.",
     "Add a bullet point specifying cross-functional collaboration with international partners.",
     "Explicitly mention familiarity with operational risk mitigation frameworks in your summary."
-  ]
+  ],
+  matched_evidence: [
+    { skill: "Cross-Functional Delivery", evidence: "strong", where: "Enterprise Operations" },
+    { skill: "SLA Auditing", evidence: "strong", where: "Client Management" },
+    { skill: "BI Reporting", evidence: "strong", where: "Data Analytics" },
+    { skill: "Resource Planning", evidence: "listed_only", where: "Skills Summary" }
+  ],
+  adjacent_matches: [
+    { jd_wants: "Six Sigma", you_have: "Lean Process Optimization", credit: 0.6 }
+  ],
+  structured_gaps: [
+    { skill: "Enterprise Risk Modeling", type: "must_have", impact: "high" },
+    { skill: "Multi-Region Compliance", type: "nice_to_have", impact: "low" }
+  ],
+  why_matches: "Demonstrated alignment across 7 core operational and client delivery competencies grounded in verifiable achievements.",
+  what_blocks: "Enterprise Risk Modeling is an essential competency missing from resume bullets."
 };
 
 export const INTERVIEW_QUESTIONS = [
