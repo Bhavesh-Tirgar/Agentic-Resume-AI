@@ -488,6 +488,16 @@ class VirtualHRService:
                 }
             }
 
+        plan_7_days = [
+            {"day": 1, "focus": "STAR Structure & Framing", "exercise": "Rewrite your primary project story into Situation (15s), Task (10s), Action (45s), Result (20s).", "target_metric": "Strict 90-second delivery with zero rambling"},
+            {"day": 2, "focus": "Quantified Business Metrics", "exercise": "Add exact latency reductions, user scale numbers, or error drop percentages to your answers.", "target_metric": "Every response contains at least 2 verified numbers"},
+            {"day": 3, "focus": "Failure Recovery & Trade-Offs", "exercise": "Prepare a 2-minute drill on an incident where things broke and how you handled the post-mortem.", "target_metric": "Clear accountability without blaming vendors or peers"},
+            {"day": 4, "focus": "Architectural Deep Dive", "exercise": "Draw out your project architecture on paper and practice explaining bottlenecks and caching layers.", "target_metric": "Defend 3 specific design choices (e.g. Postgres vs Mongo, REST vs GraphQL)"},
+            {"day": 5, "focus": "Executive Brevity & Voice Clarity", "exercise": "Record audio responses on your phone and listen for filler words ('um', 'like', 'basically').", "target_metric": "< 2 filler words per 60 seconds"},
+            {"day": 6, "focus": "Full Marcus 3D Mock Simulation", "exercise": "Run a full 4-round live mock session focusing on steady eye contact and structured delivery.", "target_metric": "Overall score >= 88% and 'Strong & Composed' grade"},
+            {"day": 7, "focus": "Reverse Interview Questions", "exercise": "Prepare 3 strategic questions for the interviewer regarding team velocity, SLAs, and technical roadmap.", "target_metric": "High-signal questions demonstrating seniority"}
+        ]
+
         # Normal passing candidate
         return {
             "overall_score": 88,
@@ -511,6 +521,7 @@ class VirtualHRService:
                 "Have 2-3 executive-ready metrics memorized for each major career project",
                 "Focus on 'I' contributions rather than diffuse 'we' descriptions"
             ],
+            "practice_plan_7_days": plan_7_days,
             "behavioral_delivery": {
                 "average_eye_contact": avg_eye or 82,
                 "average_confidence": avg_conf or 80,

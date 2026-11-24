@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo } from "react";
-import { Download, RotateCcw, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Download, RotateCcw, CheckCircle2, AlertTriangle, Calendar } from "lucide-react";
 
 interface TurnRecord {
   round: number;
@@ -124,6 +124,41 @@ export const InterviewScorecardModal = memo(function InterviewScorecardModal({
           </ul>
         </div>
       </div>
+
+      {/* 7-Day CareerPilot Practice Plan */}
+      {scorecard.practice_plan_7_days?.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-emerald-500" />
+              <span>CareerPilot 7-Day Practice Plan</span>
+            </h3>
+            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+              Targeted Remediation Drills
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            {scorecard.practice_plan_7_days.map((item: any, idx: number) => (
+              <div
+                key={idx}
+                className="p-3 rounded-xl border border-slate-200 dark:border-[#1e2330] bg-white dark:bg-[#141720] text-xs space-y-1.5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/10">
+                    Day {item.day}: {item.focus}
+                  </span>
+                </div>
+                <p className="text-slate-700 dark:text-zinc-300 text-[11px] leading-relaxed">
+                  {item.exercise}
+                </p>
+                <div className="pt-1 text-[10px] font-mono text-slate-500 dark:text-zinc-400 flex items-center gap-1">
+                  <span>🎯 Target: {item.target_metric}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Questions Practiced */}
       <div className="space-y-3 pt-2">

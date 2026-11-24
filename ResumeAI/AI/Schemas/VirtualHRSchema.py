@@ -114,6 +114,14 @@ class InterviewTurnEvaluation(BaseModel):
     )
 
 
+class DayPracticeTask(BaseModel):
+    """Specific daily drill in the CareerPilot 7-Day Practice Plan."""
+    day: int = Field(ge=1, le=7, description="Day number (1 to 7)")
+    focus: str = Field(description="Core technical or behavioral focus for this day")
+    exercise: str = Field(description="Specific actionable drill or prompt")
+    target_metric: str = Field(description="Target outcome or verification metric")
+
+
 class InterviewFinalScorecard(BaseModel):
     """Comprehensive post-interview candidate evaluation scorecard."""
     overall_score: int = Field(
@@ -165,6 +173,10 @@ class InterviewFinalScorecard(BaseModel):
     preparation_recommendations: List[str] = Field(
         default_factory=list,
         description="Specific actionable drills for candidate's upcoming real interviews."
+    )
+    practice_plan_7_days: List[DayPracticeTask] = Field(
+        default_factory=list,
+        description="Structured 7-day practice schedule targeting specific weak areas revealed during interview"
     )
     behavioral_delivery: Optional[BehavioralScorecard] = Field(
         None,
