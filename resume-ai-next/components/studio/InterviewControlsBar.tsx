@@ -30,6 +30,79 @@ export const InterviewControlsBar = memo(function InterviewControlsBar({
   onStartRecording,
   onStopRecordingAndSubmit,
 }: InterviewControlsBarProps) {
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const phaseRef = React.useRef(0);
+  const animRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    if (!isRecordingVoice) {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let running = true;
+
+    const render = () => {
+      if (!running) return;
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      phaseRef.current += 0.08 + audioLevel * 0.12;
+
+      // Draw primary sinusoidal audio wave
+      ctx.beginPath();
+      ctx.lineWidth = 2;
+      const grad = ctx.createLinearGradient(0, 0, width, 0);
+      grad.addColorStop(0, "#10b981");
+      grad.addColorStop(0.5, "#06b6d4");
+      grad.addColorStop(1, "#10b981");
+      ctx.strokeStyle = grad;
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = "rgba(16, 185, 129, 0.4)";
+
+      const amp = Math.max(3, Math.min(height / 2 - 2, 4 + audioLevel * (height * 0.75)));
+      const mid = height / 2;
+
+      for (let x = 0; x < width; x++) {
+        const norm = x / width;
+        const envelope = Math.sin(norm * Math.PI); // tapering envelope at boundaries
+        const y = mid + Math.sin(norm * 14 + phaseRef.current) * amp * envelope;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Secondary harmonics wave
+      ctx.beginPath();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = "rgba(6, 182, 212, 0.6)";
+      ctx.shadowBlur = 0;
+      for (let x = 0; x < width; x++) {
+        const norm = x / width;
+        const envelope = Math.sin(norm * Math.PI);
+        const y = mid + Math.sin(norm * 22 - phaseRef.current * 1.4) * (amp * 0.5) * envelope;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      animRef.current = requestAnimationFrame(render);
+    };
+
+    animRef.current = requestAnimationFrame(render);
+
+    return () => {
+      running = false;
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+  }, [isRecordingVoice, audioLevel]);
+
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-[#202533] bg-white dark:bg-[#111318] p-5 shadow-lg space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -93,13 +166,13 @@ export const InterviewControlsBar = memo(function InterviewControlsBar({
         </div>
       </div>
 
-      {/* Real Live Audio Waveform Equalizer driven by Web Audio API */}
+      {/* Real Live Audio Waveform Equalizer & Oscilloscope driven by Web Audio API */}
       {isRecordingVoice && (
-        <div className="flex items-center justify-between px-4 py-2 bg-slate-50 dark:bg-[#151821] rounded-xl border border-slate-200 dark:border-[#262b3a]">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-emerald-500 font-semibold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Speaking to Marcus
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 dark:bg-[#151821] rounded-xl border border-slate-200 dark:border-[#262b3a]">
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-[11px] font-mono text-emerald-500 font-semibold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Speaking to Marcus</span>
             </span>
             {isHandsFree && (
               <span className="text-[10px] text-slate-400 font-mono">
@@ -107,18 +180,32 @@ export const InterviewControlsBar = memo(function InterviewControlsBar({
               </span>
             )}
           </div>
-          {/* Live Frequency Bars */}
-          <div className="flex items-center gap-1">
-            {[0.4, 0.8, 1.2, 0.6, 1.5, 0.9, 1.1, 0.5, 1.4, 0.7, 1.0, 0.3].map((factor, i) => {
-              const height = Math.max(6, Math.min(32, audioLevel * factor * 140));
-              return (
-                <span
-                  key={i}
-                  className="w-1 bg-emerald-500 rounded-full transition-all duration-75"
-                  style={{ height: `${height}px` }}
-                />
-              );
-            })}
+
+          {/* Dual Visualizer: Oscilloscope Canvas + Frequency Bars */}
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+            {/* Live Canvas Oscilloscope */}
+            <div className="w-40 sm:w-56 h-8 bg-slate-900/60 dark:bg-[#0c0e14] rounded-lg border border-slate-200/50 dark:border-[#232938] overflow-hidden p-0.5 shadow-inner">
+              <canvas
+                ref={canvasRef}
+                width={224}
+                height={28}
+                className="w-full h-full block"
+              />
+            </div>
+
+            {/* Live Frequency Bars */}
+            <div className="flex items-center gap-1 shrink-0">
+              {[0.4, 0.8, 1.2, 0.6, 1.5, 0.9, 1.1, 0.5, 1.4, 0.7, 1.0, 0.3].map((factor, i) => {
+                const height = Math.max(6, Math.min(28, audioLevel * factor * 130));
+                return (
+                  <span
+                    key={i}
+                    className="w-1 bg-emerald-500 rounded-full transition-all duration-75"
+                    style={{ height: `${height}px` }}
+                  />
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

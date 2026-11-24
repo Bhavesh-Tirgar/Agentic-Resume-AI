@@ -456,3 +456,25 @@ class VirtualHRHistoryView(APIView):
         history = session_manager.list_candidate_history(user_id=user_id, limit=limit)
         return Response({"history": history}, status=status.HTTP_200_OK)
 
+
+class RankedGapsView(APIView):
+    """
+    CareerPilot Ranked Gaps Aggregation View.
+    Aggregates skill gaps across discovered and saved jobs, calculates unlock rates,
+    cross-references Marcus 3D interview weaknesses, and generates high-ROI bridge projects.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, resume_id):
+        resume = get_user_resume_or_default(request.user, resume_id)
+        from AI.Services.RankedGapsService import RankedGapsService
+        data = RankedGapsService.aggregate_gaps_for_resume(resume)
+        return Response(data, status=status.HTTP_200_OK)
+
+    def post(self, request, resume_id):
+        resume = get_user_resume_or_default(request.user, resume_id)
+        candidate_jobs = request.data.get("jobs", None)
+        from AI.Services.RankedGapsService import RankedGapsService
+        data = RankedGapsService.aggregate_gaps_for_resume(resume, candidate_jobs=candidate_jobs)
+        return Response(data, status=status.HTTP_200_OK)
+

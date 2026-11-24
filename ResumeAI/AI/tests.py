@@ -290,3 +290,72 @@ class AITests(TestCase):
         self.assertIn("history", res.data)
         self.assertTrue(len(res.data["history"]) >= 1)
 
+    def test_ranked_gaps_aggregation_service_and_api(self):
+        """Test CareerPilot ranked gaps aggregation across jobs and interview weaknesses"""
+        from AI.Models.InterviewSessionRecord import InterviewSessionRecord
+        from AI.Services.RankedGapsService import RankedGapsService
+
+        # Seed discovery result with Docker and Redis gaps
+        JobDiscoveryResult.objects.create(
+            resume=self.resume,
+            location_query="Ahmedabad, India",
+            work_type="All",
+            discovery_data={
+                "jobs": [
+                    {
+                        "title": "Senior Backend Developer",
+                        "company": "Apex Cloud Labs",
+                        "missing_skills": ["Docker", "Redis"],
+                        "must_haves": ["Docker"],
+                    },
+                    {
+                        "title": "Platform Infrastructure Engineer",
+                        "company": "Tech Innovations",
+                        "missing_skills": ["Docker", "Kubernetes"],
+                        "must_haves": ["Docker"],
+                    },
+                    {
+                        "title": "Database Specialist",
+                        "company": "DataScale Ltd",
+                        "missing_skills": ["Redis", "AWS"],
+                        "must_haves": ["Redis"],
+                    }
+                ]
+            }
+        )
+
+        # Seed interview weakness for Docker
+        InterviewSessionRecord.objects.create(
+            session_id="interview-session-corr-001",
+            candidate_name="Alex Pilot",
+            target_role="Backend Developer",
+            resume_id=self.resume.id,
+            user_id=self.user.id,
+            scorecard_data={
+                "critical_gaps": ["Struggled to articulate container isolation and multi-stage Docker builds."],
+                "preparation_recommendations": ["Practice writing production Dockerfiles and docker-compose."]
+            }
+        )
+
+        # 1. Test direct Service execution
+        service_data = RankedGapsService.aggregate_gaps_for_resume(self.resume)
+        self.assertIn("total_jobs_analyzed", service_data)
+        self.assertGreaterEqual(service_data["total_jobs_analyzed"], 3)
+        self.assertGreater(service_data["total_gaps_identified"], 0)
+
+        # Top skill should be Docker (highest job frequency + interview correlation)
+        top_skill = service_data["ranked_gaps"][0]
+        self.assertEqual(top_skill["skill"], "docker")
+        self.assertTrue(top_skill["interview_correlation"])
+        self.assertGreaterEqual(top_skill["unlock_percentage"], 60)
+        self.assertEqual(top_skill["action_type"], "weekend_project")
+        self.assertIn("dockerize", top_skill["action_title"].lower())
+        self.assertIn("Marcus 3D interview", service_data["top_unlock_headline"])
+
+        # 2. Test API GET endpoint
+        url = reverse("ranked-gaps", kwargs={"resume_id": self.resume.id})
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["top_unlock_skill"], "docker")
+        self.assertGreater(len(res.data["ranked_gaps"]), 0)
+

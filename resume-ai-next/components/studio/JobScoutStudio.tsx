@@ -5,11 +5,12 @@ import {
   Compass, MapPin, Building2, Briefcase, DollarSign, 
   Target, CheckCircle2, AlertCircle, ArrowRight, ExternalLink, 
   Sparkles, RefreshCw, Server, HelpCircle, Layers, Filter,
-  Navigation, Car, Train, Eye, LayoutGrid, Map as MapIcon, ShieldCheck
+  Navigation, Car, Train, Eye, LayoutGrid, Map as MapIcon, ShieldCheck, Zap
 } from "lucide-react";
 import { DEMO_DISCOVERED_JOBS, DiscoveredJobItem, JobDiscoveryData } from "@/lib/demoData";
 import { discoverJobsApi, getDiscoveredJobsApi, getActiveResumeId } from "@/lib/api";
 import { PrivacyModal } from "../PrivacyModal";
+import { RankedGapsView } from "./RankedGapsView";
 
 interface JobScoutStudioProps {
   activeResumeId?: number;
@@ -27,7 +28,7 @@ export function JobScoutStudio({
   const [selectedWorkType, setSelectedWorkType] = useState<"All" | "Remote" | "Hybrid" | "On-site">("All");
   const [selectedIndustry, setSelectedIndustry] = useState<string>("All Fields");
   const [selectedRadius, setSelectedRadius] = useState<number>(25);
-  const [viewMode, setViewMode] = useState<"grid" | "radar">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "radar" | "gaps">("grid");
   const [selectedJob, setSelectedJob] = useState<DiscoveredJobItem | null>(null);
   const [isScouting, setIsScouting] = useState(false);
   const [apiNotice, setApiNotice] = useState<string | null>(null);
@@ -151,6 +152,17 @@ export function JobScoutStudio({
             >
               <MapIcon className="w-3.5 h-3.5" />
               <span>Radius Radar</span>
+            </button>
+            <button
+              onClick={() => setViewMode("gaps")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                viewMode === "gaps"
+                  ? "bg-white dark:bg-[#232936] text-slate-900 dark:text-white shadow-xs"
+                  : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span>Ranked Gaps (ROI)</span>
             </button>
           </div>
 
@@ -305,7 +317,32 @@ export function JobScoutStudio({
         </div>
       </div>
 
-      {/* VIEW MODE 1: Interactive Radar & Geo Map */}
+      {/* CareerPilot Strategic ROI Alert Banner */}
+      {viewMode !== "gaps" && (
+        <div className="flex items-center justify-between p-3.5 rounded-xl border border-amber-500/20 bg-linear-to-r from-amber-500/10 via-emerald-500/5 to-transparent text-xs text-slate-800 dark:text-zinc-200">
+          <div className="flex items-center gap-2.5">
+            <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+            <div>
+              <span className="font-semibold text-slate-900 dark:text-white">CareerPilot Cross-Pipeline Intelligence: </span>
+              <span className="text-slate-600 dark:text-zinc-300">Discover which single skill unlocks 80% of your target positions and addresses Marcus 3D interview feedback.</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setViewMode("gaps")}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-[11px] font-mono transition shrink-0 cursor-pointer shadow-xs"
+          >
+            <span>View ROI Rankings</span>
+            <ArrowRight className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
+      {/* VIEW MODE 1: CareerPilot Cross-Job Ranked Gaps Engine */}
+      {viewMode === "gaps" && (
+        <RankedGapsView activeResumeId={effectiveResumeId} />
+      )}
+
+      {/* VIEW MODE 2: Interactive Radar & Geo Map */}
       {viewMode === "radar" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Radar Screen Visualizer */}

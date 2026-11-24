@@ -581,4 +581,39 @@ export async function deleteAccountApi(): Promise<{
   return res.json();
 }
 
+// 12. CareerPilot Cross-Job Ranked Gaps Aggregation API
+export async function getRankedGapsApi(resumeId: number): Promise<{
+  total_jobs_analyzed: number;
+  total_gaps_identified: number;
+  top_unlock_skill: string;
+  top_unlock_headline: string;
+  interview_synergy_count: number;
+  ranked_gaps: Array<{
+    skill: string;
+    display_name: string;
+    frequency: number;
+    total_jobs_evaluated: number;
+    unlock_percentage: number;
+    potential_match_boost: number;
+    gap_type: "must_have" | "adjacent" | "nice_to_have";
+    is_must_have: boolean;
+    interview_correlation: boolean;
+    interview_feedback_snippet?: string;
+    action_title: string;
+    action_type: string;
+    time_estimate: string;
+    recommended_project: string;
+  }>;
+}> {
+  const res = await fetchWithAuth(`/ai/resume/${resumeId}/ranked-gaps/`, {
+    method: "GET",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to load cross-job ranked gaps analysis");
+  }
+
+  return res.json();
+}
+
 
