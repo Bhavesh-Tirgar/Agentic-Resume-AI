@@ -28,7 +28,7 @@ export function InterviewerAvatar3D({
   const mousePos = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
   const animFrameRef = useRef<number | null>(null);
   const [internalState, setInternalState] = useState<AvatarState>(state);
-  const [displayMode, setDisplayMode] = useState<"neural-orb" | "classic-mesh">("neural-orb");
+  const [displayMode, setDisplayMode] = useState<"neural-orb" | "classic-mesh">("classic-mesh");
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 

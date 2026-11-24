@@ -216,8 +216,8 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     }
   }, [sessionId, isFinishing, onFinish]);
 
-  // Dispatch turn answer (supports both direct text and direct single-hop audio base64)
-  const dispatchTurnAnswer = useCallback(async ({ textAnswer, audioBase64 }: { textAnswer?: string; audioBase64?: string }) => {
+  // Dispatch turn answer (supports binary audio blob streaming, direct text, or fallback audio base64)
+  const dispatchTurnAnswer = useCallback(async ({ textAnswer, audioBlob, audioBase64 }: { textAnswer?: string; audioBlob?: Blob; audioBase64?: string }) => {
     if (!sessionId || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -230,6 +230,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       const res = await sendVirtualHRAnswerApi({
         session_id: sessionId,
         candidate_answer: textAnswer,
+        audio_blob: audioBlob,
         audio_base64: audioBase64,
         snapshot_base64: snapshot || undefined,
         vision_telemetry: isCamOn && liveVision ? {
@@ -247,7 +248,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         }
       });
 
-      const resolvedAnswerText = res.transcribed_text || textAnswer || (audioBase64 ? "Spoken response submitted" : "");
+      const resolvedAnswerText = res.transcribed_text || textAnswer || (audioBlob || audioBase64 ? "Spoken response submitted" : "");
 
       // Update turn record
       setTurns((prev) => {
@@ -353,16 +354,12 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         return;
       }
 
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
-      reader.onloadend = async () => {
-        const base64Audio = reader.result as string;
-        const capturedText = liveTranscriptRef.current.trim() || currentAnswer.trim();
-        await dispatchTurnAnswer({ 
-          textAnswer: capturedText || undefined, 
-          audioBase64: base64Audio 
-        });
-      };
+      // High-performance binary upload: dispatch native Blob via multipart FormData
+      const capturedText = liveTranscriptRef.current.trim() || currentAnswer.trim();
+      await dispatchTurnAnswer({ 
+        textAnswer: capturedText || undefined, 
+        audioBlob: audioBlob 
+      });
     };
 
     recorder.stop();

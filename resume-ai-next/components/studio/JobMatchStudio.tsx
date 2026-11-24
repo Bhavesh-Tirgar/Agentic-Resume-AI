@@ -30,6 +30,7 @@ export function JobMatchStudio({
   const [isMatching, setIsMatching] = useState(false);
   const [matchResult, setMatchResult] = useState<any>(DEMO_JOB_MATCH_RESULT);
   const [apiNotice, setApiNotice] = useState<string | null>(null);
+  const [backendOffline, setBackendOffline] = useState(false);
   const [activeMatchId, setActiveMatchId] = useState<number>(1);
   const [candidateInfo, setCandidateInfo] = useState<{ name: string; skillsCount: number } | null>(null);
   const [copiedSummary, setCopiedSummary] = useState(false);
@@ -101,10 +102,12 @@ export function JobMatchStudio({
         why_matches: m.why_matches || (DEMO_JOB_MATCH_RESULT as any).why_matches,
         what_blocks: m.what_blocks || (DEMO_JOB_MATCH_RESULT as any).what_blocks,
       });
+      setBackendOffline(false);
       setApiNotice(`Live API Result: Evaluated against "${jobTitle}" via Django Backend (Match ID #${res.job_match_id})`);
     } catch (err: any) {
       console.warn("Backend match call fallback:", err);
-      setApiNotice(`Evaluated with Semantic Engine: ${err.message || "Local analysis"}`);
+      setBackendOffline(true);
+      setApiNotice(`Backend Unreachable: ${err.message || "Failed to reach Django on port 8000"}`);
       setMatchResult(DEMO_JOB_MATCH_RESULT);
     } finally {
       setIsMatching(false);
@@ -165,7 +168,23 @@ export function JobMatchStudio({
         </div>
       </div>
 
-      {apiNotice && (
+      {backendOffline && (
+        <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+            <span><strong>Offline Preview Mode:</strong> Unable to connect to Django API server on port 8000. Displaying cached reference data.</span>
+          </div>
+          <button
+            onClick={handleRunMatch}
+            disabled={isMatching}
+            className="px-2.5 py-1 rounded-lg bg-amber-500 text-black font-semibold text-[11px] font-mono hover:bg-amber-400 transition shrink-0 cursor-pointer"
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
+
+      {apiNotice && !backendOffline && (
         <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
           <span>{apiNotice}</span>

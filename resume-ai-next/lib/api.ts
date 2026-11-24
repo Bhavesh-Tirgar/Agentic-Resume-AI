@@ -412,6 +412,7 @@ export async function transcribeWhisperAudioApi(audioBase64: string): Promise<{
 export async function sendVirtualHRAnswerApi(payload: {
   session_id: string;
   candidate_answer?: string;
+  audio_blob?: Blob;
   audio_base64?: string;
   vision_telemetry?: {
     eye_contact_percentage: number;
@@ -450,10 +451,27 @@ export async function sendVirtualHRAnswerApi(payload: {
   next_question?: string;
   audio_base64?: string;
 }> {
-  const res = await fetchWithAuth("/ai/interview/live/turn/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  let res: Response;
+
+  if (payload.audio_blob) {
+    // Stream binary multipart/form-data directly to avoid 33% Base64 payload bloat
+    const formData = new FormData();
+    formData.append("session_id", payload.session_id);
+    if (payload.candidate_answer) formData.append("candidate_answer", payload.candidate_answer);
+    formData.append("audio", payload.audio_blob, "turn_recording.webm");
+    if (payload.snapshot_base64) formData.append("snapshot_base64", payload.snapshot_base64);
+    if (payload.vision_telemetry) formData.append("vision_telemetry", JSON.stringify(payload.vision_telemetry));
+
+    res = await fetchWithAuth("/ai/interview/live/turn/", {
+      method: "POST",
+      body: formData,
+    }, true);
+  } else {
+    res = await fetchWithAuth("/ai/interview/live/turn/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
