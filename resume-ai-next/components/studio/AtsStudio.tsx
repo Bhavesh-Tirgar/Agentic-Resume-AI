@@ -303,7 +303,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
             type="file" 
             ref={fileInputRef} 
             onChange={handleFileUpload} 
-            accept=".pdf" 
+            accept=".pdf,.docx" 
             className="hidden" 
           />
           <button

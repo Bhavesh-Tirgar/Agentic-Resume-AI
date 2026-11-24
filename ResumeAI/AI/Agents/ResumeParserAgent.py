@@ -1,5 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate
 from AI.Utils.TokenCounter import TokenCounter
+from AI.Utils.PIIScrubber import PIIScrubber
 from AI.Services.GeminiService import GeminiService
 from AI.Prompts.ResumeParserPrompt import RESUME_PARSER_PROMPT
 from AI.Schemas.ResumeSchema import ResumeSchema
@@ -50,11 +51,17 @@ class ResumeParserAgent:
 
         result = self.chain.invoke(
             {
-                "resume_text": resume_text
+                "resume_text": PIIScrubber.redact(resume_text)[0]
             },
             config={
                     "callbacks": [token_counter]
                     }
         )
+
+        import re
+        if result.email and "[REDACTED_EMAIL" in result.email:
+            em = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", resume_text)
+            if em:
+                result.email = em.group(0)
 
         return result

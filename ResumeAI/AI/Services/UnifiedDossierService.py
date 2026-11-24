@@ -5,6 +5,7 @@ from AI.Services.GeminiService import GeminiService
 from AI.Schemas.UnifiedDossierSchema import UnifiedDossierSchema
 from AI.Prompts.UnifiedDossierPrompt import UNIFIED_DOSSIER_PROMPT
 from AI.Utils.TokenCounter import TokenCounter
+from AI.Utils.PIIScrubber import PIIScrubber
 
 logger = logging.getLogger(__name__)
 
@@ -49,16 +50,26 @@ class UnifiedDossierService:
         # Cap length at 12,000 characters to prevent token exhaustion and rate limits
         sanitized_text = raw_text.strip()[:12000]
 
+        # India DPDP / Privacy Guardrail: scrub sensitive contact information before LLM dispatch
+        scrubbed_text, pii_vault = PIIScrubber.redact(sanitized_text)
+
         start_time = time.time()
         token_counter = TokenCounter(agent_name="UnifiedDossierSynthesis")
 
         try:
             dossier: UnifiedDossierSchema = self.chain.invoke(
-                {"raw_text": sanitized_text},
+                {"raw_text": scrubbed_text},
                 config={"callbacks": [token_counter]}
             )
+
+            # Locally restore scrubbed contact info from the secure session vault
+            if dossier.email and "[REDACTED_EMAIL" in dossier.email:
+                dossier.email = PIIScrubber.restore(dossier.email, pii_vault)
+            if dossier.phone and "[REDACTED_PHONE" in dossier.phone:
+                dossier.phone = PIIScrubber.restore(dossier.phone, pii_vault)
+
             elapsed_time = round(time.time() - start_time, 2)
-            logger.info("Unified dossier synthesized in %ss", elapsed_time)
+            logger.info("Unified dossier synthesized in %ss (PII vault protected)", elapsed_time)
 
             return {
                 "dossier": dossier,

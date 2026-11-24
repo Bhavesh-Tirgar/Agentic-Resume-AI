@@ -53,7 +53,7 @@ class ResumeUploadView(APIView):
 
                 return Response(
                     {
-                        "message": "No text could be extracted from the uploaded PDF."
+                        "message": "No text could be extracted from the uploaded document (PDF or DOCX)."
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )

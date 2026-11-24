@@ -154,7 +154,7 @@ export function HeroSection({ onScanClick, onOpenStudio, onFileSelected }: HeroS
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              accept=".pdf"
+              accept=".pdf,.docx"
               className="hidden"
             />
             <button
@@ -162,7 +162,7 @@ export function HeroSection({ onScanClick, onOpenStudio, onFileSelected }: HeroS
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-xs font-medium text-slate-800 dark:text-zinc-200 bg-white dark:bg-[#12151c] border border-slate-200 dark:border-[#202533] hover:bg-slate-50 dark:hover:bg-[#181d26] transition cursor-pointer shadow-xs active:scale-95"
             >
               <Upload className="w-3.5 h-3.5" />
-              <span>Upload PDF to Scan</span>
+              <span>Upload Resume (PDF / DOCX)</span>
             </button>
           </motion.div>
 

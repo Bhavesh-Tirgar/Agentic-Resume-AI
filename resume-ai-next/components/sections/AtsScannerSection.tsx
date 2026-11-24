@@ -111,7 +111,7 @@ export function AtsScannerSection({ onOpenStudio, onResumeScanned, initialFile }
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf"
+          accept=".pdf,.docx"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -139,10 +139,10 @@ export function AtsScannerSection({ onOpenStudio, onResumeScanned, initialFile }
             <UploadCloud className="w-5 h-5" />
           </div>
           <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-            Click to upload or drag and drop resume PDF
+            Click to upload or drag and drop resume (PDF or DOCX)
           </h3>
           <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">
-            Max 5MB • Supported format: PDF • 100% Private Analysis
+            Max 5MB • Supported formats: PDF, DOCX • 100% Private Analysis
           </p>
           <button
             type="button"
