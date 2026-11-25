@@ -71,3 +71,17 @@ class ResumeAppTests(TestCase):
         del_res = self.client.delete(detail_url)
         self.assertEqual(del_res.status_code, status.HTTP_200_OK)
         self.assertFalse(Resume.objects.filter(id=resume.id).exists())
+
+    def test_storage_agnostic_stream_pdf_extraction(self):
+        """Test extract_text_from_pdf reads in-memory bytes without requiring disk .path (S3 compatible)"""
+        import pymupdf
+        from Resume.Utils.pdfExtractor import extract_text_from_pdf
+
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "Jane Doe - Senior Python & Distributed Systems Engineer\nBuilt high-throughput REST APIs, Redis session stores, and cloud storage pipelines in AWS S3.")
+        pdf_bytes = doc.tobytes()
+        doc.close()
+
+        extracted = extract_text_from_pdf(pdf_bytes, filename="cloud_resume.pdf")
+        self.assertIn("Senior Python & Distributed Systems Engineer", extracted)

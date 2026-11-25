@@ -419,3 +419,147 @@ class AITests(TestCase):
         _VOICE_CACHE["en-US-ChristopherNeural:Test phrase 1"] = "data:audio/mp3;base64,mockdata1"
         res = RealVoiceService.synthesize_to_base64("Test phrase 1")
         self.assertEqual(res, "data:audio/mp3;base64,mockdata1")
+
+    def test_whisper_payload_bounds_and_semaphore_timeout(self):
+        """Test WhisperAudioService enforces 15MB ceiling and fail-fast semaphore saturation"""
+        from AI.Services.WhisperAudioService import WhisperAudioService, _WHISPER_SEMAPHORE
+
+        oversized = b"x" * (WhisperAudioService.MAX_AUDIO_BYTES + 1)
+        with self.assertRaises(ValueError):
+            WhisperAudioService.transcribe(oversized)
+
+        # Saturate both semaphore slots and verify fail-fast TimeoutError
+        orig_timeout = WhisperAudioService.SEMAPHORE_TIMEOUT_SEC
+        WhisperAudioService.SEMAPHORE_TIMEOUT_SEC = 0.05
+        _WHISPER_SEMAPHORE.acquire()
+        _WHISPER_SEMAPHORE.acquire()
+        try:
+            with self.assertRaises(TimeoutError):
+                WhisperAudioService.transcribe(b"small audio bytes")
+        finally:
+            _WHISPER_SEMAPHORE.release()
+            _WHISPER_SEMAPHORE.release()
+            WhisperAudioService.SEMAPHORE_TIMEOUT_SEC = orig_timeout
+
+    def test_session_rehydration_question_anonymous_isolation_and_contract(self):
+        """Test question rehydration, anonymous history isolation, owner-only session access, and frontend keys"""
+        from AI.Services.InterviewSessionManager import session_manager, _LOCAL_SESSION_STORE
+
+        session = session_manager.create_session(
+            candidate_name="Alex Isolated",
+            target_role="Staff Backend",
+            user_id=self.user.id,
+            max_rounds=4,
+        )
+        session["current_question"] = "Walk me through your toughest outage."
+        session["turns"] = [
+            {"round": 1, "question": "Walk me through your toughest outage.", "answer": "Done", "evaluation": {"star_score": 88}}
+        ]
+        session["scorecard"] = {
+            "verdict": "Hire",
+            "overall_score": 89,
+            "summary": "Solid architecture clarity.",
+            "top_strengths": ["Clear metrics"],
+            "critical_gaps": [],
+            "preparation_recommendations": ["Keep practicing"],
+        }
+        session_manager.save_session(session["session_id"], session)
+
+        # 1. Rehydrate question after memory eviction
+        _LOCAL_SESSION_STORE.clear()
+        rehydrated = session_manager.get_session(session["session_id"])
+        self.assertIsNotNone(rehydrated)
+        self.assertEqual(rehydrated["current_question"], "Walk me through your toughest outage.")
+
+        # 2. Anonymous history returns [] (zero cross-user leakage)
+        self.assertEqual(session_manager.list_candidate_history(user_id=None), [])
+
+        # 3. Authenticated history matches InterviewHistoryView contract
+        hist_res = self.client.get(reverse("virtual-hr-history"))
+        self.assertEqual(hist_res.status_code, status.HTTP_200_OK)
+        self.assertIn("total_records", hist_res.data)
+        rec = hist_res.data["history"][0]
+        self.assertIn("id", rec)
+        self.assertEqual(rec["verdict"], "Hire")
+        self.assertEqual(rec["overall_score"], 89)
+        self.assertEqual(rec["turns_count"], 1)
+
+        # 4. Another authenticated user cannot access self.user's private interview session
+        other_user = User.objects.create_user(username="snooper", password="Password123!")
+        other_client = APIClient()
+        other_client.force_authenticate(user=other_user)
+        snoop_res = other_client.get(reverse("virtual-hr-session", kwargs={"session_id": session["session_id"]}))
+        self.assertEqual(snoop_res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_virtual_hr_rolling_history_and_scorecard_false_positive_safety(self):
+        """Test rolling history compression (>2 rounds) and false-positive safety in scorecard fallback"""
+        from AI.Services.VirtualHRService import VirtualHRService
+
+        turns = [
+            {
+                "round": i,
+                "question": f"Q{i}",
+                "answer": f"In round {i}, we predict peak database load using zero-copy serialization buffers across distributed microservices, reducing tail p99 latency by forty percent.",
+                "evaluation": {"star_score": 85 + i, "critique": f"Solid round {i} breakdown"},
+            }
+            for i in range(1, 5)
+        ]
+        summary = VirtualHRService._build_history_summary(turns)
+        self.assertIn("Earlier Rounds Digest:", summary)
+        self.assertIn("[Round 3]", summary)
+        self.assertIn("[Round 4]", summary)
+        self.assertNotIn("[Round 1]", summary)
+
+        vhr = VirtualHRService()
+        scorecard = vhr._fallback_scorecard({"turns": turns})
+        self.assertEqual(scorecard["verdict"], "Hire")
+        self.assertEqual(scorecard["overall_score"], 88)
+
+    @patch("AI.Services.JobDiscoveryService.requests.get")
+    def test_adzuna_cache_and_daily_quota_guard(self, mock_get):
+        """Test Adzuna 6-hour query caching and daily quota ceiling guard"""
+        import os
+        from datetime import datetime, timezone
+        from django.core.cache import cache
+        from AI.Services.JobDiscoveryService import fetch_real_jobs_from_adzuna
+
+        cache.clear()
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {"results": [{"id": "job-1", "title": "Python Engineer"}]}
+        mock_get.return_value.raise_for_status.return_value = None
+
+        with patch.dict(os.environ, {"ADZUNA_APP_ID": "test-id", "ADZUNA_APP_KEY": "test-key", "ADZUNA_DAILY_CAP": "2"}):
+            first = fetch_real_jobs_from_adzuna("Backend Engineer", ["Python", "Django"], "Bengaluru")
+            second = fetch_real_jobs_from_adzuna("Backend Engineer", ["Python", "Django"], "Bengaluru")
+            self.assertEqual(len(first), 1)
+            self.assertEqual(len(second), 1)
+            self.assertEqual(mock_get.call_count, 1)  # Second served from cache!
+
+            # Exhaust quota and make distinct query -> returns [] without hitting HTTP
+            day_key = f"adzuna_daily_quota:{datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
+            cache.set(day_key, 2, timeout=3600)
+            throttled = fetch_real_jobs_from_adzuna("Staff SRE", ["Go", "Kubernetes"], "London")
+            self.assertEqual(throttled, [])
+            self.assertEqual(mock_get.call_count, 1)
+
+    def test_vision_telemetry_formdata_json_and_snapshot_cap(self):
+        """Test JSON stringified telemetry parsing and oversized snapshot rejection"""
+        import json
+        from AI.Services.CandidateVisionService import CandidateVisionService
+
+        # FormData sends telemetry as JSON string
+        raw_json = json.dumps({
+            "camera_active": True,
+            "eye_contact_percentage": 91,
+            "confidence_score": 88,
+            "nervousness_score": 12,
+            "gaze_direction": "Direct / Focused",
+            "facial_demeanor": "Confident & Composed",
+        })
+        vis = CandidateVisionService.process_telemetry(client_telemetry=raw_json)
+        self.assertEqual(vis.eye_contact_percentage, 91)
+        self.assertEqual(vis.confidence_score, 88)
+
+        # Oversized snapshot safely skipped without calling multimodal vision LLM
+        oversized_snap = "data:image/jpeg;base64," + ("A" * (CandidateVisionService.MAX_SNAPSHOT_B64_CHARS + 50))
+        self.assertIsNone(CandidateVisionService.analyze_snapshot_with_vision(oversized_snap))

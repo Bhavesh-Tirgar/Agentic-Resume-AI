@@ -43,8 +43,11 @@ class ResumeUploadView(APIView):
         )
 
         try:
+            with resume.resume_file.open("rb") as f:
+                file_bytes = f.read()
             text = extract_text_from_pdf(
-                resume.resume_file.path
+                file_bytes,
+                filename=resume.resume_file.name,
             )
 
             if not text.strip():
@@ -111,5 +114,10 @@ class ResumeDetailView(APIView):
 
     def delete(self, request, resume_id):
         resume = get_object_or_404(Resume, id=resume_id, user=request.user)
+        if resume.resume_file:
+            try:
+                resume.resume_file.delete(save=False)
+            except Exception:
+                pass
         resume.delete()
         return Response({"message": "Resume deleted successfully."}, status=status.HTTP_200_OK)

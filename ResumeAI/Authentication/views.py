@@ -182,18 +182,23 @@ class DeleteAccountView(APIView):
         username = user.username
         erased_files_count = 0
 
-        # 1. Cryptographically shred physical files on storage
+        # 1. Cryptographically shred physical files on storage (local or remote S3)
         for resume in Resume.objects.filter(user=user):
             if resume.resume_file:
                 try:
-                    file_path = resume.resume_file.path
-                    if os.path.isfile(file_path):
+                    try:
+                        file_path = resume.resume_file.path
+                    except (NotImplementedError, ValueError, Exception):
+                        file_path = None
+
+                    if file_path and os.path.isfile(file_path):
                         file_size = os.path.getsize(file_path)
-                        # Overwrite with cryptographically secure random bytes
+                        # Overwrite local file bytes with cryptographically secure randomness
                         with open(file_path, "wb") as f:
                             f.write(os.urandom(file_size))
-                        os.remove(file_path)
-                        erased_files_count += 1
+
+                    resume.resume_file.delete(save=False)
+                    erased_files_count += 1
                 except Exception as exc:
                     logger.warning("Could not shred physical file %s: %s", resume.resume_file, exc)
 

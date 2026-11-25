@@ -1,3 +1,5 @@
+import json
+import time
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -16,6 +18,15 @@ from AI.Services.ResumeProcessService import ResumeProcessingService
 from AI.Services.JobMatchingService import JobMatchingService
 from AI.Services.InterviewPlanningService import InterviewPlanningService
 from AI.Services.JobDiscoveryService import JobDiscoveryService
+
+
+def _is_session_authorized(request, session: dict) -> bool:
+    """Allows guest sessions (user_id=None) or restricts user-owned sessions to their owner."""
+    owner_id = session.get("user_id")
+    if owner_id is None:
+        return True
+    req_user = getattr(request, "user", None)
+    return bool(req_user and req_user.is_authenticated and req_user.id == owner_id)
 
 
 def get_user_resume_or_default(user, resume_id: int) -> Resume:
@@ -68,6 +79,7 @@ Strategic Planning, Project Delivery, Enterprise Operations, Process Optimizatio
 
 class ResumeProcessView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_scope = "ai_heavy"
 
     def get(self, request, resume_id):
         resume = get_user_resume_or_default(request.user, resume_id)
@@ -139,6 +151,7 @@ class ResumeProcessView(APIView):
 
 class JobMatchingView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_scope = "ai_heavy"
 
     def get(self, request, resume_id):
         resume = get_user_resume_or_default(request.user, resume_id)
@@ -200,7 +213,6 @@ class InterviewPlanningView(APIView):
         resume = get_user_resume_or_default(request.user, resume_id)
         plan = InterviewPlanResult.objects.filter(resume=resume).first()
         if not plan:
-            # Auto-create if not generated yet
             try:
                 plan = InterviewPlanningService.create_plan(resume=resume, job_match_id=job_match_id)
             except Exception:
@@ -218,7 +230,6 @@ class InterviewPlanningView(APIView):
     def post(self, request, resume_id, job_match_id):
         resume = get_user_resume_or_default(request.user, resume_id)
 
-        # Ensure a matching result exists for this resume
         match = JobMatchResult.objects.filter(id=job_match_id, resume=resume).first()
         if not match:
             match = JobMatchResult.objects.filter(resume=resume).first()
@@ -258,6 +269,7 @@ class InterviewPlanningView(APIView):
 
 class JobDiscoveryView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_scope = "ai_heavy"
 
     def get(self, request, resume_id):
         resume = get_user_resume_or_default(request.user, resume_id)
@@ -294,7 +306,7 @@ class JobDiscoveryView(APIView):
         work_type = request.data.get("work_type", "All")
         raw_radius = request.data.get("radius_km") or request.data.get("radius", 25)
         try:
-            radius_km = int(raw_radius)
+            radius_km = max(1, min(150, int(raw_radius)))
         except (ValueError, TypeError):
             radius_km = 25
 
@@ -331,12 +343,16 @@ class JobDiscoveryView(APIView):
 class VirtualHRStartView(APIView):
     """Initializes a new real-time interactive mock interview with Virtual HR."""
     permission_classes = [AllowAny]
+    throttle_scope = "virtual_hr_turn"
 
     def post(self, request):
         candidate_name = request.data.get("candidate_name")
         target_role = request.data.get("target_role", "Senior Software Engineer")
         resume_id = request.data.get("resume_id")
-        max_rounds = int(request.data.get("max_rounds", 4))
+        try:
+            max_rounds = max(1, min(10, int(request.data.get("max_rounds", 4))))
+        except (ValueError, TypeError):
+            max_rounds = 4
         user_id = request.user.id if request.user and request.user.is_authenticated else None
 
         try:
@@ -357,21 +373,36 @@ class VirtualHRStartView(APIView):
 class VirtualHRTurnView(APIView):
     """Processes a candidate answer via Whisper audio transcription or direct text, returning STAR critique and next question."""
     permission_classes = [AllowAny]
+    throttle_scope = "virtual_hr_turn"
 
     def post(self, request):
+        t0 = time.perf_counter()
         session_id = request.data.get("session_id")
         candidate_answer = request.data.get("candidate_answer", "")
         audio_file = request.FILES.get("audio")
         audio_base64 = request.data.get("audio_base64")
-        vision_telemetry = request.data.get("vision_telemetry")
+        raw_telemetry = request.data.get("vision_telemetry")
         snapshot_base64 = request.data.get("snapshot_base64")
 
         if not session_id:
             return Response({"error": "session_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Require at least one form of input
-        if not audio_file and not audio_base64 and not candidate_answer.strip():
+        # Normalize FormData JSON-stringified telemetry
+        if isinstance(raw_telemetry, str):
+            try:
+                vision_telemetry = json.loads(raw_telemetry)
+            except Exception:
+                vision_telemetry = {}
+        else:
+            vision_telemetry = raw_telemetry
+
+        if not audio_file and not audio_base64 and not str(candidate_answer).strip():
             return Response({"error": "Audio recording or text answer is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from AI.Services.InterviewSessionManager import session_manager
+        existing = session_manager.get_session(session_id)
+        if existing and not _is_session_authorized(request, existing):
+            return Response({"error": "Not authorized to access this interview session."}, status=status.HTTP_403_FORBIDDEN)
 
         try:
             from AI.Services.InterviewAgent import InterviewAgent
@@ -384,16 +415,22 @@ class VirtualHRTurnView(APIView):
                 client_telemetry=vision_telemetry,
                 snapshot_base64=snapshot_base64
             )
+            result["latency_ms"] = int((time.perf_counter() - t0) * 1000)
             return Response(result, status=status.HTTP_200_OK)
+        except TimeoutError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except ValueError as exc:
-            return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+            err_msg = str(exc)
+            code = status.HTTP_400_BAD_REQUEST if "exceeds" in err_msg.lower() else status.HTTP_404_NOT_FOUND
+            return Response({"error": err_msg}, status=code)
         except Exception as exc:
             return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class WhisperTranscribeView(APIView):
-    """Direct Whisper audio speech-to-text endpoint."""
+    """Direct Whisper audio speech-to-text endpoint with payload and concurrency guards."""
     permission_classes = [AllowAny]
+    throttle_scope = "whisper_stt"
 
     def post(self, request):
         audio_file = request.FILES.get("audio")
@@ -408,7 +445,18 @@ class WhisperTranscribeView(APIView):
                 text = WhisperAudioService.transcribe(audio_file)
             else:
                 text = WhisperAudioService.transcribe_base64(audio_base64)
-            return Response({"transcription": text}, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    "transcription": text,
+                    "transcribed_text": text,
+                    "model": "faster-whisper-base.en",
+                },
+                status=status.HTTP_200_OK,
+            )
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except TimeoutError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except Exception as exc:
             return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -421,6 +469,11 @@ class VirtualHRFinishView(APIView):
         session_id = request.data.get("session_id")
         if not session_id:
             return Response({"error": "session_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from AI.Services.InterviewSessionManager import session_manager
+        existing = session_manager.get_session(session_id)
+        if existing and not _is_session_authorized(request, existing):
+            return Response({"error": "Not authorized to finish this interview session."}, status=status.HTTP_403_FORBIDDEN)
 
         try:
             from AI.Services.VirtualHRService import VirtualHRService
@@ -442,6 +495,8 @@ class VirtualHRSessionView(APIView):
         session = session_manager.get_session(session_id)
         if not session:
             return Response({"error": "Session not found or expired."}, status=status.HTTP_404_NOT_FOUND)
+        if not _is_session_authorized(request, session):
+            return Response({"error": "Not authorized to view this interview session."}, status=status.HTTP_403_FORBIDDEN)
         return Response(session, status=status.HTTP_200_OK)
 
 
@@ -452,9 +507,12 @@ class VirtualHRHistoryView(APIView):
     def get(self, request):
         from AI.Services.InterviewSessionManager import session_manager
         user_id = request.user.id if request.user and request.user.is_authenticated else None
-        limit = int(request.query_params.get("limit", 10))
+        try:
+            limit = max(1, min(50, int(request.query_params.get("limit", 10))))
+        except (ValueError, TypeError):
+            limit = 10
         history = session_manager.list_candidate_history(user_id=user_id, limit=limit)
-        return Response({"history": history}, status=status.HTTP_200_OK)
+        return Response({"total_records": len(history), "history": history}, status=status.HTTP_200_OK)
 
 
 class RankedGapsView(APIView):
@@ -477,4 +535,3 @@ class RankedGapsView(APIView):
         from AI.Services.RankedGapsService import RankedGapsService
         data = RankedGapsService.aggregate_gaps_for_resume(resume, candidate_jobs=candidate_jobs)
         return Response(data, status=status.HTTP_200_OK)
-

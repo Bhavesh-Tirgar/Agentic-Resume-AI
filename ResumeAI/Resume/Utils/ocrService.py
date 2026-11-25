@@ -2,6 +2,7 @@ import io
 import os
 import shutil
 import logging
+from typing import Union
 import pymupdf
 
 logger = logging.getLogger(__name__)
@@ -10,11 +11,12 @@ logger = logging.getLogger(__name__)
 class OCRService:
     """
     OCR fallback for scanned/image-based PDFs.
+    Supports both filesystem paths and in-memory bytes (for object storage).
     Dynamically probes available Tesseract traineddata languages to avoid crashes.
     """
 
     @staticmethod
-    def extract_text(pdf_path: str) -> str:
+    def extract_text(pdf_source: Union[str, bytes]) -> str:
         try:
             import pytesseract
             from PIL import Image
@@ -40,7 +42,11 @@ class OCRService:
         except Exception:
             lang_param = "eng"
 
-        document = pymupdf.open(pdf_path)
+        if isinstance(pdf_source, (bytes, bytearray)):
+            document = pymupdf.open(stream=bytes(pdf_source), filetype="pdf")
+        else:
+            document = pymupdf.open(pdf_source)
+
         extracted_text = []
 
         try:

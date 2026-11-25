@@ -10,7 +10,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
-from pathlib import Path
 from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -30,7 +29,7 @@ load_dotenv()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv(
-    "SECRET_KEY", 
+    "SECRET_KEY",
     "careerpilot-sec-vault-4f81c9a0b3e7d21658e3-insecure-dev-only"
 )
 
@@ -38,8 +37,8 @@ SECRET_KEY = os.getenv(
 DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = [
-    h.strip() 
-    for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0,testserver").split(",") 
+    h.strip()
+    for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0,testserver").split(",")
     if h.strip()
 ]
 
@@ -91,10 +90,11 @@ TEMPLATES = [
 WSGI_APPLICATION = 'Backend.wsgi.application'
 
 
-# Database
+# Database & Connection Pooling
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 USE_POSTGRES = os.getenv("USE_POSTGRES", "false").lower() in ("true", "1")
+DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", "60"))
 
 if USE_POSTGRES and os.getenv("DB_NAME"):
     DATABASES = {
@@ -105,6 +105,11 @@ if USE_POSTGRES and os.getenv("DB_NAME"):
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "localhost"),
             "PORT": os.getenv("DB_PORT", "5432"),
+            "CONN_MAX_AGE": DB_CONN_MAX_AGE,
+            "CONN_HEALTH_CHECKS": True,
+            "OPTIONS": {
+                "connect_timeout": 5,
+            },
         }
     }
 else:
@@ -114,6 +119,55 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
             'OPTIONS': {'timeout': 30},
         }
+    }
+
+
+# Distributed Cache (Redis in production via USE_REDIS_CACHE=true, bounded LocMem locally)
+REDIS_URL = os.getenv("REDIS_URL", "").strip()
+USE_REDIS_CACHE = os.getenv("USE_REDIS_CACHE", "false").lower() in ("true", "1")
+
+if USE_REDIS_CACHE and REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "TIMEOUT": 3600,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "careerpilot-locmem-cache",
+            "TIMEOUT": 3600,
+            "OPTIONS": {
+                "MAX_ENTRIES": 2000,
+            },
+        }
+    }
+
+
+# Hard Payload Limits & Optional Cloud Object Storage (S3 / Cloudflare R2 / GCS)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 16 * 1024 * 1024  # 16 MB max JSON / multipart body
+FILE_UPLOAD_MAX_MEMORY_SIZE = 16 * 1024 * 1024  # 16 MB max audio / document file
+
+USE_S3 = os.getenv("USE_S3", "false").lower() in ("true", "1")
+if USE_S3 and os.getenv("AWS_STORAGE_BUCKET_NAME"):
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3.S3Storage",
+            "OPTIONS": {
+                "bucket_name": os.getenv("AWS_STORAGE_BUCKET_NAME"),
+                "region_name": os.getenv("AWS_S3_REGION_NAME", "ap-south-1"),
+                "default_acl": "private",
+                "file_overwrite": False,
+                "querystring_auth": True,
+                "querystring_expire": 3600,
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
     }
 
 
@@ -162,10 +216,14 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/minute",
         "user": "500/minute",
+        "whisper_stt": os.getenv("THROTTLE_WHISPER_STT", "30/minute"),
+        "ai_heavy": os.getenv("THROTTLE_AI_HEAVY", "60/minute"),
+        "virtual_hr_turn": os.getenv("THROTTLE_VIRTUAL_HR_TURN", "60/minute"),
     },
 }
 
@@ -202,4 +260,3 @@ def configure_sqlite_wal(sender, connection, **kwargs):
             cursor.execute('PRAGMA journal_mode = WAL;')
             cursor.execute('PRAGMA busy_timeout = 5000;')
             cursor.execute('PRAGMA synchronous = NORMAL;')
-

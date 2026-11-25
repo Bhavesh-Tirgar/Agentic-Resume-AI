@@ -1,6 +1,7 @@
-import base64
+import json
 import logging
 from typing import Any, Dict, Optional
+from django.core.cache import cache
 from AI.Schemas.VirtualHRSchema import VisionTelemetry
 
 logger = logging.getLogger(__name__)
@@ -17,18 +18,30 @@ class CandidateVisionService:
     - Reading / cheating cues (glancing away from lens at notes)
     """
 
+    MAX_SNAPSHOT_B64_CHARS = 350_000  # ~250 KB compressed JPEG frame ceiling
+    SNAPSHOT_COOLDOWN_SEC = 3
+
     @classmethod
     def analyze_snapshot_with_vision(cls, snapshot_base64: str) -> Optional[VisionTelemetry]:
         """
         Runs true multimodal vision inference on the webcam snapshot frame.
+        Enforces strict payload ceiling before parsing or transmitting images.
         """
-        if not snapshot_base64:
+        if not snapshot_base64 or not isinstance(snapshot_base64, str):
+            return None
+
+        if len(snapshot_base64) > cls.MAX_SNAPSHOT_B64_CHARS:
+            logger.warning(
+                "CandidateVisionService: Rejected oversized snapshot (%d chars > %d cap)",
+                len(snapshot_base64),
+                cls.MAX_SNAPSHOT_B64_CHARS,
+            )
             return None
 
         # Clean base64 header if present
         cleaned_b64 = snapshot_base64
         if "base64," in cleaned_b64:
-            cleaned_b64 = cleaned_b64.split("base64,")[1]
+            cleaned_b64 = cleaned_b64.split("base64,", 1)[1]
 
         try:
             from AI.Services.GeminiService import GeminiService
@@ -59,26 +72,46 @@ class CandidateVisionService:
             logger.warning("CandidateVisionService: Vision analysis failed, falling back to heuristics: %s", exc)
             return None
 
+    @staticmethod
+    def _coerce_telemetry_dict(raw: Any) -> Dict[str, Any]:
+        """Safely normalizes telemetry submitted via JSON body or FormData string."""
+        if isinstance(raw, dict):
+            return raw
+        if isinstance(raw, str) and raw.strip():
+            try:
+                parsed = json.loads(raw)
+                return parsed if isinstance(parsed, dict) else {}
+            except Exception:
+                return {}
+        return {}
+
     @classmethod
     def process_telemetry(
         cls,
-        client_telemetry: Optional[Dict[str, Any]] = None,
-        snapshot_base64: Optional[str] = None
+        client_telemetry: Optional[Any] = None,
+        snapshot_base64: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> VisionTelemetry:
         """
         Synthesizes client telemetry and webcam snapshot into a verified VisionTelemetry model.
         Prioritizes sub-millisecond client telemetry to eliminate 3.5s multimodal API latency.
-        Falls back to multimodal vision only when client telemetry is absent.
+        Falls back to rate-throttled multimodal vision only when client telemetry is absent.
         """
-        client_telemetry = client_telemetry or {}
+        telemetry = cls._coerce_telemetry_dict(client_telemetry)
 
-        # 1. Camera is completely OFF if no snapshot and client explicitly reports camera disabled
-        is_camera_explicitly_off = (
-            not snapshot_base64 and 
-            not client_telemetry.get("camera_active", False)
+        eye_raw = telemetry.get("eye_contact_percentage")
+        gaze_raw = telemetry.get("gaze_direction", "")
+        has_live_metrics = (
+            telemetry.get("camera_active", False)
+            or (
+                isinstance(eye_raw, (int, float))
+                and eye_raw > 0
+                and gaze_raw not in ("Camera Off / Disabled", "Camera Disabled (Audio / Text Mode)")
+            )
         )
 
-        if is_camera_explicitly_off:
+        # 1. Camera is completely OFF if no snapshot and no active client telemetry metrics
+        if not snapshot_base64 and not has_live_metrics:
             return VisionTelemetry(
                 eye_contact_percentage=0,
                 confidence_score=20,
@@ -88,12 +121,12 @@ class CandidateVisionService:
             )
 
         # 2. Fast-Path: Prioritize sub-millisecond client telemetry (<1ms latency)
-        if client_telemetry and client_telemetry.get("camera_active", False):
-            eye_contact = int(client_telemetry.get("eye_contact_percentage", 75))
-            confidence = int(client_telemetry.get("confidence_score", 70))
-            nervousness = int(client_telemetry.get("nervousness_score", 25))
-            gaze = client_telemetry.get("gaze_direction", "Direct / Focused")
-            demeanor = client_telemetry.get("facial_demeanor", "Composed")
+        if has_live_metrics:
+            eye_contact = int(telemetry.get("eye_contact_percentage", 75))
+            confidence = int(telemetry.get("confidence_score", 70))
+            nervousness = int(telemetry.get("nervousness_score", 25))
+            gaze = telemetry.get("gaze_direction", "Direct / Focused")
+            demeanor = telemetry.get("facial_demeanor", "Composed")
 
             return VisionTelemetry(
                 eye_contact_percentage=max(0, min(100, eye_contact)),
@@ -103,11 +136,15 @@ class CandidateVisionService:
                 facial_demeanor=demeanor
             )
 
-        # 3. Fallback: Run multimodal vision inference on the snapshot only if client telemetry was missing
+        # 3. Throttled Fallback: Run multimodal vision on snapshot only if within cooldown window
         if snapshot_base64:
-            vision_result = cls.analyze_snapshot_with_vision(snapshot_base64)
-            if vision_result:
-                return vision_result
+            throttle_key = f"vision_snap_cooldown:{session_id}" if session_id else None
+            if throttle_key and not cache.add(throttle_key, 1, timeout=cls.SNAPSHOT_COOLDOWN_SEC):
+                logger.info("CandidateVisionService: Snapshot vision throttled for session %s; using baseline.", session_id)
+            else:
+                vision_result = cls.analyze_snapshot_with_vision(snapshot_base64)
+                if vision_result:
+                    return vision_result
 
         # 4. Baseline default
         return VisionTelemetry(

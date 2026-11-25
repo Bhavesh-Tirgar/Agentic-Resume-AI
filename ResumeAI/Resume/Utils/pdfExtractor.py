@@ -1,5 +1,7 @@
+import io
 import os
 import logging
+from typing import Optional, Union
 import pymupdf
 
 logger = logging.getLogger(__name__)
@@ -7,14 +9,15 @@ logger = logging.getLogger(__name__)
 OCR_THRESHOLD = 100
 
 
-def extract_text_from_docx(docx_path: str) -> str:
+def extract_text_from_docx(source: Union[str, bytes]) -> str:
     """
-    Extracts structured text from a Word DOCX document,
+    Extracts structured text from a Word DOCX file path or raw bytes,
     including body paragraphs and table contents.
     """
     try:
         import docx
-        doc = docx.Document(docx_path)
+        doc_input = io.BytesIO(source) if isinstance(source, (bytes, bytearray)) else source
+        doc = docx.Document(doc_input)
         text_parts = []
 
         # Extract paragraphs
@@ -35,23 +38,29 @@ def extract_text_from_docx(docx_path: str) -> str:
                     text_parts.append(" | ".join(unique_cells))
 
         extracted = "\n".join(text_parts).strip()
-        logger.info("Extracted %d characters from DOCX document: %s", len(extracted), os.path.basename(docx_path))
+        label = "bytes-stream" if isinstance(source, (bytes, bytearray)) else os.path.basename(source)
+        logger.info("Extracted %d characters from DOCX document: %s", len(extracted), label)
         return extracted
     except Exception as exc:
-        logger.exception("Failed to parse DOCX file %s: %s", docx_path, exc)
+        logger.exception("Failed to parse DOCX document: %s", exc)
         return ""
 
 
-def extract_text_from_pdf(file_path: str) -> str:
+def extract_text_from_pdf(source: Union[str, bytes], filename: Optional[str] = None) -> str:
     """
-    Universal document text extraction for PDF and DOCX.
-    1. If .docx: uses python-docx for native XML extraction.
-    2. If .pdf: uses PyMuPDF with automatic OCR fallback for scanned images.
+    Universal storage-agnostic document text extraction for PDF and DOCX.
+    Accepts either a local filesystem path or raw file bytes (for S3/cloud object storage).
+    1. If .docx or ZIP magic header: uses python-docx for native XML extraction.
+    2. If PDF: uses PyMuPDF with automatic OCR fallback for scanned images.
     """
-    if file_path.lower().endswith(".docx"):
-        return extract_text_from_docx(file_path)
+    is_bytes = isinstance(source, (bytes, bytearray))
+    inferred_name = (filename or ("" if is_bytes else str(source))).lower()
+    is_docx = inferred_name.endswith(".docx") or (is_bytes and bytes(source[:2]) == b"PK")
 
-    document = pymupdf.open(file_path)
+    if is_docx:
+        return extract_text_from_docx(bytes(source) if is_bytes else source)
+
+    document = pymupdf.open(stream=bytes(source), filetype="pdf") if is_bytes else pymupdf.open(source)
 
     try:
         text = ""
@@ -67,7 +76,7 @@ def extract_text_from_pdf(file_path: str) -> str:
         try:
             from .ocrService import OCRService
             logger.info("Native text extraction sparse (<%d chars). Initiating OCR fallback.", OCR_THRESHOLD)
-            ocr_text = OCRService.extract_text(file_path)
+            ocr_text = OCRService.extract_text(bytes(source) if is_bytes else source)
             if ocr_text and ocr_text.strip():
                 return ocr_text
         except Exception as e:

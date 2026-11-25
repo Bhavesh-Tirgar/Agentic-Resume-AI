@@ -1,8 +1,11 @@
-import re
-import os
+import hashlib
 import logging
-import requests
+import os
+import re
+from datetime import datetime, timezone
 from urllib.parse import quote_plus
+import requests
+from django.core.cache import cache
 from django.db import transaction
 from Resume.models import Resume
 from AI.Models.JobDiscoveryResult import JobDiscoveryResult
@@ -104,12 +107,35 @@ def fetch_real_jobs_from_adzuna(
     query_parts = [role] + skills[:2]
     if work_type == "Remote":
         query_parts.append("remote")
+    query_str = " ".join(query_parts)
+
+    # 1. Check 6-hour Django cache before touching external Adzuna quota
+    cache_raw = f"{country}|{work_type.lower()}|{location.lower().strip()}|{query_str.lower().strip()}|{results_per_page}"
+    cache_key = f"adzuna_jobs:{hashlib.sha256(cache_raw.encode('utf-8')).hexdigest()[:24]}"
+    cached_results = cache.get(cache_key)
+    if cached_results is not None:
+        logger.info("Adzuna cache HIT for query '%s' (%d jobs)", query_str, len(cached_results))
+        return cached_results
+
+    # 2. Enforce daily quota ceiling (keeps safety margin below 250 req/day free tier)
+    daily_cap = int(os.getenv("ADZUNA_DAILY_CAP", "220"))
+    day_key = f"adzuna_daily_quota:{datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
+    cache.add(day_key, 0, timeout=86400)
+    try:
+        current_count = cache.incr(day_key)
+    except Exception:
+        current_count = (cache.get(day_key) or 0) + 1
+        cache.set(day_key, current_count, timeout=86400)
+
+    if current_count > daily_cap:
+        logger.warning("Adzuna daily quota cap reached (%d/%d) — serving grounded fallback.", current_count, daily_cap)
+        return []
 
     url = f"https://api.adzuna.com/v1/api/jobs/{country}/search/1"
     params = {
         "app_id": app_id,
         "app_key": app_key,
-        "what": " ".join(query_parts),
+        "what": query_str,
         "where": location if country != "in" else "",
         "results_per_page": results_per_page,
         "sort_by": "relevance",
@@ -122,7 +148,9 @@ def fetch_real_jobs_from_adzuna(
         resp = requests.get(url, params=params, timeout=8)
         resp.raise_for_status()
         results = resp.json().get("results", [])
-        logger.info("Adzuna returned %d jobs for query '%s' in country %s", len(results), " ".join(query_parts), country)
+        cache.set(cache_key, results, timeout=6 * 3600)  # Cache for 6 hours
+        logger.info("Adzuna returned %d jobs for query '%s' in country %s (quota %d/%d)",
+                    len(results), query_str, country, current_count, daily_cap)
         return results
     except Exception as exc:
         logger.warning("Adzuna API call failed (%s) — will use grounded fallback.", exc)

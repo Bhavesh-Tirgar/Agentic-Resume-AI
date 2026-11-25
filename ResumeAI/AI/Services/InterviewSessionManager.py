@@ -1,21 +1,25 @@
+import collections
 import json
 import logging
 import os
+import threading
 import time
 import uuid
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Fast in-memory session cache
-_LOCAL_SESSION_STORE: Dict[str, Dict[str, Any]] = {}
+# Bounded thread-safe LRU session cache (prevents unbounded RAM growth)
+_MAX_LOCAL_SESSIONS = 1000
+_LOCAL_CACHE_LOCK = threading.Lock()
+_LOCAL_SESSION_STORE: collections.OrderedDict[str, Dict[str, Any]] = collections.OrderedDict()
 
 
 class InterviewSessionManager:
     """
     Enterprise Tri-Tier Session & State Persistence Engine.
     Tier 1: Redis In-Memory Cluster Cache (<1ms read/write)
-    Tier 2: In-Memory Fast Local Dict Cache
+    Tier 2: Bounded LRU Local Dict Cache (thread-safe, max 1000 sessions)
     Tier 3: PostgreSQL / SQLite Relational Audit Store (InterviewSessionRecord)
 
     Guarantees zero session drop across worker restarts, hot reloads, and horizontal scaling.
@@ -24,6 +28,7 @@ class InterviewSessionManager:
     def __init__(self):
         self.redis_client = None
         self.redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+        self._last_redis_retry = 0.0
         self._init_redis()
 
     def _init_redis(self):
@@ -42,13 +47,30 @@ class InterviewSessionManager:
             self.redis_client = None
             logger.info("InterviewSessionManager: Redis cluster offline (%s). Using dual memory + DB persistence.", e)
 
+    @staticmethod
+    def _write_local_lru(session_id: str, data: Dict[str, Any]):
+        """Stores a session inside the bounded thread-safe OrderedDict LRU cache."""
+        with _LOCAL_CACHE_LOCK:
+            now = time.time()
+            # Prune expired entries up front when near capacity
+            if len(_LOCAL_SESSION_STORE) >= _MAX_LOCAL_SESSIONS:
+                expired = [k for k, v in _LOCAL_SESSION_STORE.items() if now > v.get("expires_at", 0)]
+                for k in expired:
+                    _LOCAL_SESSION_STORE.pop(k, None)
+            if session_id in _LOCAL_SESSION_STORE:
+                _LOCAL_SESSION_STORE.move_to_end(session_id)
+            elif len(_LOCAL_SESSION_STORE) >= _MAX_LOCAL_SESSIONS:
+                _LOCAL_SESSION_STORE.popitem(last=False)
+            _LOCAL_SESSION_STORE[session_id] = data
+
     def create_session(
         self,
         candidate_name: str,
         target_role: str,
         resume_id: Optional[int] = None,
         user_id: Optional[int] = None,
-        max_rounds: int = 4
+        max_rounds: int = 4,
+        candidate_summary: str = ""
     ) -> Dict[str, Any]:
         """Creates a new interview session and synchronizes across all tiers."""
         session_id = str(uuid.uuid4())
@@ -58,6 +80,7 @@ class InterviewSessionManager:
             "target_role": target_role or "Senior Software Engineer",
             "resume_id": resume_id,
             "user_id": user_id,
+            "candidate_summary": candidate_summary,
             "created_at": time.time(),
             "expires_at": time.time() + 7200,  # 2 hours
             "status": "active",
@@ -73,7 +96,7 @@ class InterviewSessionManager:
     def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """
         Retrieves session data by ID using cascading lookup:
-        Redis -> Local Memory -> Database Rehydration.
+        Redis -> Bounded Local Memory -> Database Rehydration.
         """
         if not session_id:
             return None
@@ -87,34 +110,44 @@ class InterviewSessionManager:
             except Exception as e:
                 logger.warning("Redis get_session failed, falling back: %s", e)
 
-        # Tier 2: Local Memory
-        entry = _LOCAL_SESSION_STORE.get(session_id)
-        if entry:
-            if time.time() <= entry.get("expires_at", 0):
-                return entry
-            del _LOCAL_SESSION_STORE[session_id]
+        # Tier 2: Bounded Local LRU Memory
+        with _LOCAL_CACHE_LOCK:
+            entry = _LOCAL_SESSION_STORE.get(session_id)
+            if entry:
+                if time.time() <= entry.get("expires_at", 0):
+                    _LOCAL_SESSION_STORE.move_to_end(session_id)
+                    return entry
+                _LOCAL_SESSION_STORE.pop(session_id, None)
 
         # Tier 3: Database Rehydration (Audit Recovery)
         try:
             from AI.Models.InterviewSessionRecord import InterviewSessionRecord
-            record = InterviewSessionRecord.objects.filter(session_id=session_id).first()
+            record = InterviewSessionRecord.objects.select_related("resume").filter(session_id=session_id).first()
             if record:
+                turns = record.turns_data or []
+                recovered_question = turns[-1].get("question", "") if turns else ""
+                recovered_summary = (
+                    record.resume.extracted_text[:1000]
+                    if record.resume and record.resume.extracted_text
+                    else ""
+                )
                 rehydrated = {
                     "session_id": record.session_id,
                     "candidate_name": record.candidate_name,
                     "target_role": record.target_role,
                     "resume_id": record.resume_id,
                     "user_id": record.user_id,
+                    "candidate_summary": recovered_summary,
+                    "current_question": recovered_question,
                     "status": record.status,
                     "current_round": record.current_round,
                     "max_rounds": record.max_rounds,
-                    "turns": record.turns_data or [],
+                    "turns": turns,
                     "scorecard": record.scorecard_data,
                     "created_at": record.created_at.timestamp() if record.created_at else time.time(),
                     "expires_at": time.time() + 7200,
                 }
-                # Rehydrate memory and Redis
-                _LOCAL_SESSION_STORE[session_id] = rehydrated
+                self._write_local_lru(session_id, rehydrated)
                 if self.redis_client:
                     try:
                         self.redis_client.setex(f"interview_session:{session_id}", 7200, json.dumps(rehydrated))
@@ -131,7 +164,7 @@ class InterviewSessionManager:
         """
         Saves or updates session data simultaneously to:
         1. Redis Cache
-        2. Local In-Memory Store
+        2. Bounded Local LRU Store
         3. Database Audit Record
         """
         session_data["updated_at"] = time.time()
@@ -147,8 +180,8 @@ class InterviewSessionManager:
             except Exception as e:
                 logger.warning("Redis save_session failed: %s", e)
 
-        # Tier 2: In-Memory
-        _LOCAL_SESSION_STORE[session_id] = session_data
+        # Tier 2: Bounded Local LRU
+        self._write_local_lru(session_id, session_data)
 
         # Tier 3: Database Persistence
         try:
@@ -181,27 +214,40 @@ class InterviewSessionManager:
         return session
 
     def list_candidate_history(self, user_id: Optional[int] = None, limit: int = 10) -> List[Dict[str, Any]]:
-        """Queries persistent audit history for a candidate."""
+        """
+        Queries persistent audit history strictly scoped to an authenticated user.
+        Returns an empty list for anonymous callers to prevent cross-user record leakage.
+        """
+        if not user_id:
+            return []
+
         try:
             from AI.Models.InterviewSessionRecord import InterviewSessionRecord
-            qs = InterviewSessionRecord.objects.all()
-            if user_id:
-                qs = qs.filter(user_id=user_id)
-            records = qs.order_by("-created_at")[:limit]
-            return [
-                {
+            records = InterviewSessionRecord.objects.filter(user_id=user_id).order_by("-created_at")[:limit]
+            output = []
+            for r in records:
+                sc = r.scorecard_data if isinstance(r.scorecard_data, dict) else {}
+                turns = r.turns_data or []
+                output.append({
+                    "id": r.id,
                     "session_id": r.session_id,
                     "candidate_name": r.candidate_name,
                     "target_role": r.target_role,
                     "status": r.status,
                     "current_round": r.current_round,
                     "max_rounds": r.max_rounds,
-                    "rounds_completed": len(r.turns_data or []),
+                    "rounds_completed": len(turns),
+                    "turns_count": len(turns),
+                    "verdict": sc.get("verdict") or ("Completed" if r.status == "completed" else "In Progress"),
+                    "overall_score": sc.get("overall_score", 0),
+                    "summary": sc.get("summary", ""),
+                    "top_strengths": sc.get("top_strengths", []),
+                    "critical_gaps": sc.get("critical_gaps", []),
+                    "preparation_recommendations": sc.get("preparation_recommendations", []),
                     "scorecard": r.scorecard_data,
                     "created_at": r.created_at.isoformat() if r.created_at else None,
-                }
-                for r in records
-            ]
+                })
+            return output
         except Exception as e:
             logger.warning("Failed to list candidate history: %s", e)
             return []

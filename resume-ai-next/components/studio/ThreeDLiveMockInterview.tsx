@@ -77,6 +77,35 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
   // Neural Human Voice Audio Player (Marcus Vance)
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const currentAudioBase64Ref = useRef<string | null>(null);
+  const isMutedRef = useRef(isMuted);
+  const avatarStateRef = useRef<AvatarState>(avatarState);
+  const skipNextOnStopSubmitRef = useRef(false);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
+
+  useEffect(() => {
+    avatarStateRef.current = avatarState;
+  }, [avatarState]);
+
+  // Explicit user-gesture AudioContext unlocker for Chrome / Mobile Safari autoplay policy
+  const unlockAudioEngine = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!audioContextRef.current || audioContextRef.current.state === "closed") {
+        audioContextRef.current = new AudioCtx();
+      }
+      if (audioContextRef.current.state === "suspended") {
+        await audioContextRef.current.resume();
+      }
+    } catch {}
+  }, []);
 
   const playNeuralAudio = useCallback((audioBase64?: string | null) => {
     if (!audioBase64) return;
@@ -87,6 +116,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       }
       currentAudioBase64Ref.current = audioBase64;
       const audio = new Audio(audioBase64);
+      audio.muted = isMutedRef.current;
       audioPlayerRef.current = audio;
       setAvatarState("speaking");
 
@@ -234,12 +264,14 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         audio_base64: audioBase64,
         snapshot_base64: snapshot || undefined,
         vision_telemetry: isCamOn && liveVision ? {
+          camera_active: true,
           eye_contact_percentage: liveVision.eye_contact_percentage,
           confidence_score: liveVision.confidence_score,
           nervousness_score: liveVision.nervousness_score,
           gaze_direction: liveVision.gaze_direction,
           facial_demeanor: liveVision.facial_demeanor
         } : {
+          camera_active: false,
           eye_contact_percentage: 0,
           confidence_score: 20,
           nervousness_score: 0,
@@ -349,6 +381,10 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       setIsRecordingVoice(false);
 
       const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+      if (skipNextOnStopSubmitRef.current) {
+        skipNextOnStopSubmitRef.current = false;
+        return;
+      }
       if (audioBlob.size < 500) {
         setAvatarState("idle");
         return;
@@ -367,7 +403,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
 
   // Start microphone recording with Web Audio API VAD & Barge-in
   const startRecording = useCallback(async () => {
-    if (avatarState === "speaking") {
+    if (avatarStateRef.current === "speaking") {
       handleStopSpeaking();
       setBargeInNotice("Barge-In: Marcus yielded the floor to you.");
       setTimeout(() => setBargeInNotice(null), 3000);
@@ -398,7 +434,14 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         }
       };
 
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx =
+        audioContextRef.current && audioContextRef.current.state !== "closed"
+          ? audioContextRef.current
+          : new AudioCtx();
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
       audioContextRef.current = audioCtx;
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
@@ -419,7 +462,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
         const avg = sum / pcmData.length / 255;
         setAudioLevel(avg);
 
-        if (avatarState === "speaking" && avg > 0.05) {
+        if (avatarStateRef.current === "speaking" && avg > 0.05) {
           handleStopSpeaking();
           setBargeInNotice("Barge-In: Marcus yielded the floor to you.");
           setTimeout(() => setBargeInNotice(null), 3000);
@@ -490,10 +533,11 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     } catch (err: any) {
       setErrorMessage("Microphone access denied or not available. Please allow mic permissions in your browser or type your answer below.");
     }
-  }, [avatarState, isHandsFree, handleStopSpeaking, stopRecordingAndSubmit]);
+  }, [isHandsFree, handleStopSpeaking, stopRecordingAndSubmit]);
 
   // Handle Starting Interview
   const handleStartInterview = useCallback(async () => {
+    await unlockAudioEngine();
     setIsStarting(true);
     try {
       const resumeId = activeResumeId || getActiveResumeId();
@@ -543,7 +587,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     } finally {
       setIsStarting(false);
     }
-  }, [activeResumeId, candidateNameInput, roleInput, maxRounds, playNeuralAudio, isHandsFree, startRecording]);
+  }, [activeResumeId, candidateNameInput, roleInput, maxRounds, playNeuralAudio, isHandsFree, startRecording, unlockAudioEngine]);
 
   const handleSubmitAnswer = useCallback(async () => {
     if (!sessionId || !currentAnswer.trim() || isSubmitting) return;
@@ -552,7 +596,16 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
+      if (speechRecognitionRef.current) {
+        try {
+          speechRecognitionRef.current.stop();
+        } catch {}
+        speechRecognitionRef.current = null;
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        skipNextOnStopSubmitRef.current = true;
+        mediaRecorderRef.current.stop();
+      }
       setIsRecordingVoice(false);
     }
 

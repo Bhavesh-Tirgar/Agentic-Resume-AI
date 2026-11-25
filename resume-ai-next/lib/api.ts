@@ -415,6 +415,7 @@ export async function sendVirtualHRAnswerApi(payload: {
   audio_blob?: Blob;
   audio_base64?: string;
   vision_telemetry?: {
+    camera_active?: boolean;
     eye_contact_percentage: number;
     confidence_score: number;
     nervousness_score: number;

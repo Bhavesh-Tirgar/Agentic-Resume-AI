@@ -1,17 +1,15 @@
 import re
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from langchain_core.prompts import PromptTemplate
 from AI.Services.GeminiService import GeminiService
 from AI.Services.InterviewSessionManager import session_manager
 from AI.Services.CandidateVisionService import CandidateVisionService
 from AI.Schemas.VirtualHRSchema import (
-    InterviewTurnEvaluation, 
+    InterviewTurnEvaluation,
     InterviewFinalScorecard,
     VisionTelemetry,
-    BehavioralScorecard
 )
 from AI.Prompts.VirtualHRPrompt import VIRTUAL_HR_EVALUATION_PROMPT, VIRTUAL_HR_SCORECARD_PROMPT
 from Resume.models import Resume
@@ -26,11 +24,80 @@ class VirtualHRService:
     adaptive follow-up probing, and executive hiring scorecards.
     """
 
+    # Inflection-aware regexes prevent false positives on benign words (e.g. 'predict' containing 'dick')
+    PROFANITY_PATTERNS = [
+        r'\bfuck[a-z]*\b',
+        r'\bshit[a-z]*\b',
+        r'\bbitch[a-z]*\b',
+        r'\basshole[a-z]*\b',
+        r'\bdick[s]?\b',
+        r'\bdamn[a-z]*\b',
+        r'\bcunt[s]?\b',
+        r'f\*\*k',
+    ]
+
+    COPIED_PHRASES = [
+        "just copy",
+        "i copy",
+        "copied from stack",
+        "copy pasted",
+        "didn't make it",
+        "didnt make it",
+    ]
+
+    SHRUG_PHRASES = ["don't know", "dont know", "no idea", "dunno", "not sure"]
+
     def __init__(self):
         self.gemini_service = GeminiService()
         self.llm = self.gemini_service.get_llm()
         self.turn_evaluator = self.llm.with_structured_output(InterviewTurnEvaluation)
         self.scorecard_compiler = self.llm.with_structured_output(InterviewFinalScorecard)
+
+    @classmethod
+    def _has_profanity(cls, text: str) -> bool:
+        lower = (text or "").lower()
+        return any(re.search(pat, lower) for pat in cls.PROFANITY_PATTERNS)
+
+    @classmethod
+    def _has_copied_admission(cls, text: str) -> bool:
+        lower = (text or "").lower()
+        return any(phrase in lower for phrase in cls.COPIED_PHRASES)
+
+    @staticmethod
+    def _build_history_summary(turns: List[Dict[str, Any]]) -> str:
+        """
+        Compresses multi-turn history to eliminate LLM context-window bloat.
+        Older rounds (>2 turns back) are rolled into 1-line STAR digests;
+        only the latest 2 completed turns retain dialogue detail.
+        """
+        completed = [t for t in turns if t.get("answer")]
+        if not completed:
+            return "No prior answers yet."
+
+        lines: List[str] = []
+        older = completed[:-2]
+        recent = completed[-2:]
+
+        if older:
+            digest_items = []
+            for idx, t in enumerate(older, start=1):
+                ev = t.get("evaluation") or {}
+                star = ev.get("star_score", "N/A")
+                critique_short = (ev.get("critique") or "")[:80].replace("\n", " ")
+                digest_items.append(f"R{idx} ({star}/100): {critique_short}")
+            lines.append("Earlier Rounds Digest: " + " | ".join(digest_items))
+
+        start_idx = len(older) + 1
+        for offset, t in enumerate(recent):
+            r_num = start_idx + offset
+            ev = t.get("evaluation") or {}
+            lines.append(
+                f"[Round {r_num}] Q: {t.get('question', '')[:160]}\n"
+                f"Candidate Answer: {t.get('answer', '')[:320]}\n"
+                f"STAR Score: {ev.get('star_score', 'N/A')}/100 | Critique: {ev.get('critique', '')[:110]}"
+            )
+
+        return "\n".join(lines)
 
     def start_interview(
         self,
@@ -51,8 +118,10 @@ class VirtualHRService:
                 resume = Resume.objects.filter(id=resume_id).first()
                 if resume and resume.extracted_text:
                     candidate_summary = resume.extracted_text[:1000]
-                    if not resolved_name and resume.parsed_data and isinstance(resume.parsed_data, dict):
-                        resolved_name = resume.parsed_data.get("name")
+                    parser_res = getattr(resume, "parser_result", None)
+                    parsed = getattr(parser_res, "parsed_data", None) if parser_res else None
+                    if not resolved_name and isinstance(parsed, dict):
+                        resolved_name = parsed.get("name")
             except Exception as e:
                 logger.warning("Could not load resume data for interview start: %s", e)
 
@@ -64,7 +133,8 @@ class VirtualHRService:
             target_role=resolved_role,
             resume_id=resume_id,
             user_id=user_id,
-            max_rounds=max_rounds
+            max_rounds=max_rounds,
+            candidate_summary=candidate_summary,
         )
 
         first_question = (
@@ -103,8 +173,8 @@ class VirtualHRService:
         }
 
     def evaluate_turn(
-        self, 
-        session_id: str, 
+        self,
+        session_id: str,
         candidate_answer: str,
         client_telemetry: Optional[Dict[str, Any]] = None,
         snapshot_base64: Optional[str] = None
@@ -124,23 +194,15 @@ class VirtualHRService:
         candidate_name = session.get("candidate_name", "Candidate")
         target_role = session.get("target_role", "Software Engineer")
 
-        # Process vision and behavioral telemetry
+        # Process vision and behavioral telemetry with turn-level throttling inside CandidateVisionService
         vision_metrics = CandidateVisionService.process_telemetry(
             client_telemetry=client_telemetry,
-            snapshot_base64=snapshot_base64
+            snapshot_base64=snapshot_base64,
+            session_id=session_id,
         )
 
-        # Build concise dialogue history summary
-        history_lines = []
-        for idx, t in enumerate(session.get("turns", []), start=1):
-            if t.get("answer"):
-                ev = t.get("evaluation") or {}
-                history_lines.append(
-                    f"[Round {idx}] Q: {t.get('question', '')[:200]}\n"
-                    f"Candidate Answer: {t.get('answer', '')[:400]}\n"
-                    f"STAR Score: {ev.get('star_score', 'N/A')}/100 | Critique: {ev.get('critique', '')[:120]}"
-                )
-        history_summary = "\n".join(history_lines) if history_lines else "No prior answers yet."
+        # Build compressed rolling dialogue history summary
+        history_summary = self._build_history_summary(session.get("turns", []))
 
         # Candidate summary from resume or dynamic session context
         candidate_summary = session.get("candidate_summary") or f"Applying for {target_role}"
@@ -185,8 +247,8 @@ class VirtualHRService:
         except Exception as exc:
             logger.exception("Virtual HR turn evaluation failed, using fallback: %s", exc)
             eval_result = self._fallback_turn_evaluation(
-                candidate_answer, 
-                current_round, 
+                candidate_answer,
+                current_round,
                 max_rounds,
                 vision_metrics
             )
@@ -300,36 +362,23 @@ class VirtualHRService:
         }
 
     def _fallback_turn_evaluation(
-        self, 
-        answer: str, 
-        current_round: int, 
+        self,
+        answer: str,
+        current_round: int,
         max_rounds: int,
         vision_metrics: Optional[VisionTelemetry] = None
     ) -> InterviewTurnEvaluation:
         ans_lower = answer.lower()
-        PROFANITY_PATTERNS = [
-            r'\bfuck[a-z]*\b',
-            r'\bshit[a-z]*\b',
-            r'\bbitch[a-z]*\b',
-            r'\basshole[a-z]*\b',
-            r'\bdick[s]?\b',
-            r'\bdamn[a-z]*\b',
-            r'\bcunt[s]?\b',
-            r'f\*\*k'
-        ]
-        has_profanity = any(re.search(pat, ans_lower) for pat in PROFANITY_PATTERNS)
+        has_profanity = self._has_profanity(answer)
+        is_copied = self._has_copied_admission(answer)
 
-        COPIED_PHRASES = ["just copy", "i copy", "copied from stack", "copy pasted", "didn't make it", "didnt make it"]
-        is_copied = any(phrase in ans_lower for phrase in COPIED_PHRASES)
-
-        SHRUG_PHRASES = ["don't know", "dont know", "no idea", "dunno", "not sure"]
         words = answer.strip().split()
         word_count = len(words)
-        is_brief_shrug = any(phrase in ans_lower for phrase in SHRUG_PHRASES) and word_count <= 8
+        is_brief_shrug = any(phrase in ans_lower for phrase in self.SHRUG_PHRASES) and word_count <= 8
 
         is_camera_off = (
-            not vision_metrics or 
-            vision_metrics.gaze_direction in ["Camera Off / Disabled", "Camera Disabled (Audio / Text Mode)"] or 
+            not vision_metrics or
+            vision_metrics.gaze_direction in ["Camera Off / Disabled", "Camera Disabled (Audio / Text Mode)"] or
             vision_metrics.facial_demeanor == "Camera Off" or
             vision_metrics.eye_contact_percentage == 0
         )
@@ -444,13 +493,12 @@ class VirtualHRService:
     def _fallback_scorecard(self, session: Dict[str, Any], vision_records: list = None) -> Dict[str, Any]:
         turns = session.get("turns", [])
         answers = [t.get("answer", "") or "" for t in turns]
-        all_text = " ".join(answers).lower()
+        all_text = " ".join(answers)
 
-        PROFANITY_WORDS = ["fuck", "shit", "bitch", "asshole", "dick", "damn", "f**k", "cunt"]
-        has_profanity = any(w in all_text for w in PROFANITY_WORDS)
+        has_profanity = self._has_profanity(all_text)
         total_words = sum(len(a.split()) for a in answers)
         avg_words = total_words / max(1, len(answers))
-        has_copied = any("copy" in a.lower() for a in answers)
+        has_copied = any(self._has_copied_admission(a) for a in answers)
 
         avg_eye = 0
         avg_conf = 30
