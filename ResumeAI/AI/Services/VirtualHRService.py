@@ -74,6 +74,19 @@ class VirtualHRService:
             logger.warning("Could not synthesize Virtual HR voice: %s", e)
             return None
 
+    def _save_and_synthesize(self, session_id: str, session: Dict[str, Any], spoken_text: str) -> Optional[str]:
+        """Save session state while synthesizing TTS audio concurrently with a hard timeout."""
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        audio_future = pool.submit(self._synthesize_voice_safe, spoken_text)
+        try:
+            session_manager.save_session(session_id, session)
+            return audio_future.result(timeout=12.0)
+        except Exception as e:
+            logger.warning("Virtual HR voice synthesis timed out or failed: %s", e)
+            return None
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+
     @classmethod
     def _has_profanity(cls, text: str) -> bool:
         lower = (text or "").lower()
@@ -173,11 +186,7 @@ class VirtualHRService:
             "timestamp": time.time()
         })
 
-        audio_b64 = None
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            audio_future = pool.submit(self._synthesize_voice_safe, first_question)
-            session_manager.save_session(session["session_id"], session)
-            audio_b64 = audio_future.result(timeout=12.0)
+        audio_b64 = self._save_and_synthesize(session["session_id"], session, first_question)
 
         return {
             "session_id": session["session_id"],
@@ -313,10 +322,7 @@ class VirtualHRService:
             progress_callback("stage", {"stage": "synthesizing", "message": "Synthesizing Marcus Vance voice..."})
 
         # Overlap network TTS synthesis concurrently while saving DB/Redis state on request thread
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            audio_future = pool.submit(self._synthesize_voice_safe, spoken_dialogue)
-            session_manager.save_session(session_id, session)
-            audio_b64 = audio_future.result(timeout=12.0)
+        audio_b64 = self._save_and_synthesize(session_id, session, spoken_dialogue)
 
         return {
             "session_id": session_id,

@@ -570,7 +570,8 @@ class AITests(TestCase):
         from AI.Services.VirtualHRService import VirtualHRService
         from AI.Services.InterviewSessionManager import session_manager
 
-        with patch.dict(os.environ, {"GEMINI_API_KEY": ""}):
+        with patch.dict(os.environ, {"GEMINI_API_KEY": ""}), \
+             patch("AI.Services.RealVoiceService.RealVoiceService.synthesize_to_base64", return_value=None):
             vhr = VirtualHRService()
             sess = session_manager.create_session(candidate_name="Fallback User", target_role="Backend Engineer", user_id=self.user.id)
             res = vhr.evaluate_turn(sess["session_id"], "I led a PostgreSQL sharding migration reducing p99 latency by 45% across 12 services.")
@@ -671,20 +672,23 @@ class AITests(TestCase):
         vhr.turn_evaluator = mock_eval
         vhr.scorecard_compiler = MagicMock()
         mock_eval.invoke.side_effect = RuntimeError("mock offline")
-        vhr.evaluate_turn(sess["session_id"], "We scaled PostgreSQL read replicas across 3 AZs achieving 99.99% uptime.")
+        with patch("AI.Services.RealVoiceService.RealVoiceService.synthesize_to_base64", return_value=None):
+            vhr.evaluate_turn(sess["session_id"], "We scaled PostgreSQL read replicas across 3 AZs achieving 99.99% uptime.")
         prompt_sent = mock_eval.invoke.call_args[0][0]
         self.assertIn("<untrusted_candidate_answer_", prompt_sent)
         self.assertIn("<untrusted_candidate_summary_", prompt_sent)
 
-        # Verify SSE streaming endpoint emits stage/transcript & final result
+        # Verify SSE streaming endpoint emits stage/transcript & final result (mocking live LLM & TTS network calls)
         stream_url = reverse("virtual-hr-turn-stream")
-        res = self.client.post(stream_url, {
-            "session_id": sess["session_id"],
-            "candidate_answer": "We introduced Redis connection pooling and reduced database load by 62%.",
-        })
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertIn("text/event-stream", res["Content-Type"])
-        body_text = b"".join(res.streaming_content).decode("utf-8")
+        with patch("AI.Services.VirtualHRService.VirtualHRService._ensure_llm", return_value=None), \
+             patch("AI.Services.RealVoiceService.RealVoiceService.synthesize_to_base64", return_value="data:audio/mp3;base64,mocktts"):
+            res = self.client.post(stream_url, {
+                "session_id": sess["session_id"],
+                "candidate_answer": "We introduced Redis connection pooling and reduced database load by 62%.",
+            })
+            self.assertEqual(res.status_code, status.HTTP_200_OK)
+            self.assertIn("text/event-stream", res["Content-Type"])
+            body_text = b"".join(res.streaming_content).decode("utf-8")
         self.assertIn("event: transcript", body_text)
         self.assertIn("event: result", body_text)
         # Extract result JSON line
