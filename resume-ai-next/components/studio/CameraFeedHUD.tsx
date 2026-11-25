@@ -54,6 +54,10 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
     const saccadeSweepCounterRef = useRef<number>(0);
     const lastXDeltaSignRef = useRef<number>(0);
     const lastDecaySecRef = useRef<number>(0);
+    const faceDetectorRef = useRef<any>(null);
+    const faceDetectBusyRef = useRef<boolean>(false);
+    const detectedFaceBoxRef = useRef<{ minX: number; minY: number; maxX: number; maxY: number; engine: string } | null>(null);
+    const [visionEngineLabel, setVisionEngineLabel] = useState<string>("15 FPS");
 
     // Initialize Camera Stream
     useEffect(() => {
@@ -134,6 +138,16 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
       let lastRun = 0;
       let lastUiCommit = 0;
 
+      // Initialize hardware-accelerated native browser FaceDetector if supported (Chrome/Edge)
+      if (typeof window !== "undefined" && "FaceDetector" in window && !faceDetectorRef.current) {
+        try {
+          faceDetectorRef.current = new (window as any).FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+          setVisionEngineLabel("Neural");
+        } catch {
+          faceDetectorRef.current = null;
+        }
+      }
+
       const processVisionFrame = (timestamp: number) => {
         // Throttle processing to ~15 FPS (~66ms per frame)
         if (timestamp - lastRun < 66) {
@@ -147,65 +161,132 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
           const h = canvas.height;
           ctx.drawImage(video, 0, 0, w, h);
 
-          try {
-            const frame = ctx.getImageData(0, 0, w, h);
-            const data = frame.data;
+          // Kick off non-blocking hardware FaceDetector scan if available
+          if (faceDetectorRef.current && !faceDetectBusyRef.current) {
+            faceDetectBusyRef.current = true;
+            faceDetectorRef.current
+              .detect(canvas)
+              .then((faces: any[]) => {
+                if (faces && faces.length > 0 && faces[0].boundingBox) {
+                  const b = faces[0].boundingBox;
+                  detectedFaceBoxRef.current = {
+                    minX: b.x,
+                    minY: b.y,
+                    maxX: b.x + b.width,
+                    maxY: b.y + b.height,
+                    engine: "Neural",
+                  };
+                } else {
+                  detectedFaceBoxRef.current = null;
+                }
+              })
+              .catch(() => {
+                faceDetectorRef.current = null;
+                setVisionEngineLabel("15 FPS");
+              })
+              .finally(() => {
+                faceDetectBusyRef.current = false;
+              });
+          }
 
-            let skinPixelCount = 0;
-            let sumX = 0;
-            let sumY = 0;
+          try {
+            let hasCompactFaceRegion = false;
+            let centroidX = w / 2;
+            let centroidY = h / 2;
             let minX = w;
             let maxX = 0;
             let minY = h;
             let maxY = 0;
 
-            // Illumination-invariant normalized chromaticity filter with geometric head prior
-            const maxYBound = h * 0.72; // Exclude shirts/desks in lower quadrant
-            for (let y = 0; y < maxYBound; y += 4) {
-              for (let x = 0; x < w; x += 4) {
-                const idx = (y * w + x) * 4;
-                const r = data[idx];
-                const g = data[idx + 1];
-                const b = data[idx + 2];
+            if (detectedFaceBoxRef.current) {
+              const fb = detectedFaceBoxRef.current;
+              minX = fb.minX;
+              maxX = fb.maxX;
+              minY = fb.minY;
+              maxY = fb.maxY;
+              centroidX = (minX + maxX) / 2;
+              centroidY = (minY + maxY) / 2;
+              hasCompactFaceRegion = (maxX - minX) > 10 && (maxY - minY) > 10;
+            } else {
+              // Dual YCbCr + Normalized RGB Skin Cluster with Bilateral Eye-Contrast Verification
+              const frame = ctx.getImageData(0, 0, w, h);
+              const data = frame.data;
 
-                const totalIntensity = r + g + b + 0.001;
-                const normR = r / totalIntensity;
-                const normG = g / totalIntensity;
+              let skinPixelCount = 0;
+              let sumX = 0;
+              let sumY = 0;
+              let lumSum = 0;
 
-                // Inclusive human skin tone in normalized chromaticity across diverse complexions and ambient lighting
-                const isSkinChromaticity = (
-                  normR > 0.30 && normR < 0.58 &&
-                  normG > 0.22 && normG < 0.40 &&
-                  r > 35 && (r - b) > 4
-                );
+              const maxYBound = h * 0.75;
+              for (let y = 0; y < maxYBound; y += 4) {
+                for (let x = 0; x < w; x += 4) {
+                  const idx = (y * w + x) * 4;
+                  const r = data[idx];
+                  const g = data[idx + 1];
+                  const b = data[idx + 2];
 
-                if (isSkinChromaticity) {
-                  skinPixelCount++;
-                  sumX += x;
-                  sumY += y;
-                  if (x < minX) minX = x;
-                  if (x > maxX) maxX = x;
-                  if (y < minY) minY = y;
-                  if (y > maxY) maxY = y;
+                  const totalIntensity = r + g + b + 0.001;
+                  const normR = r / totalIntensity;
+                  const normG = g / totalIntensity;
+
+                  // YCbCr chromaticity coefficients (ITU-R BT.601)
+                  const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+                  const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+
+                  const isSkinYCbCr = cb >= 77 && cb <= 127 && cr >= 133 && cr <= 175;
+                  const isSkinNorm = normR > 0.30 && normR < 0.58 && normG > 0.22 && normG < 0.40 && r > 35 && (r - b) > 4;
+
+                  if (isSkinYCbCr || isSkinNorm) {
+                    skinPixelCount++;
+                    sumX += x;
+                    sumY += y;
+                    lumSum += 0.299 * r + 0.587 * g + 0.114 * b;
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                  }
                 }
+              }
+
+              const sampledCount = Math.ceil(maxYBound / 4) * Math.ceil(w / 4);
+              const skinCoverageRatio = skinPixelCount / Math.max(1, sampledCount);
+              const boxWidthRatio = (maxX - minX) / Math.max(1, w);
+              const boxHeightRatio = (maxY - minY) / Math.max(1, h);
+
+              // Verify bilateral eye-band depression (darker eye sockets inside upper-middle third) to reject blank warm walls
+              let hasEyeBandContrast = true;
+              if (skinPixelCount > 80 && skinCoverageRatio < 0.65) {
+                const meanSkinLum = lumSum / skinPixelCount;
+                const eyeYStart = Math.max(0, Math.floor(minY + (maxY - minY) * 0.22));
+                const eyeYEnd = Math.min(h - 1, Math.floor(minY + (maxY - minY) * 0.48));
+                let darkerEyePixels = 0;
+                let eyeSamples = 0;
+                for (let ey = eyeYStart; ey <= eyeYEnd; ey += 4) {
+                  for (let ex = Math.max(0, Math.floor(minX + (maxX - minX) * 0.15)); ex <= Math.min(w - 1, Math.floor(maxX - (maxX - minX) * 0.15)); ex += 4) {
+                    const idx = (ey * w + ex) * 4;
+                    const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+                    eyeSamples++;
+                    if (lum < meanSkinLum * 0.85) darkerEyePixels++;
+                  }
+                }
+                hasEyeBandContrast = eyeSamples === 0 || darkerEyePixels / Math.max(1, eyeSamples) > 0.04;
+              }
+
+              hasCompactFaceRegion = (
+                skinPixelCount > 80 &&
+                skinCoverageRatio < 0.65 &&
+                boxWidthRatio > 0.08 &&
+                boxHeightRatio > 0.08 &&
+                hasEyeBandContrast
+              );
+              if (hasCompactFaceRegion) {
+                centroidX = sumX / skinPixelCount;
+                centroidY = sumY / skinPixelCount;
               }
             }
 
-            // Guard against blank/background wash walls triggered across >65% of sampled pixels
-            const sampledCount = Math.ceil(maxYBound / 4) * Math.ceil(w / 4);
-            const skinCoverageRatio = skinPixelCount / Math.max(1, sampledCount);
-            const boxWidthRatio = (maxX - minX) / Math.max(1, w);
-            const boxHeightRatio = (maxY - minY) / Math.max(1, h);
-            const hasCompactFaceRegion = (
-              skinPixelCount > 80 &&
-              skinCoverageRatio < 0.65 &&
-              boxWidthRatio > 0.08 &&
-              boxHeightRatio > 0.08
-            );
-
             if (hasCompactFaceRegion) {
-              const centroidX = sumX / skinPixelCount;
-              const centroidY = sumY / skinPixelCount;
 
               // Normalized centroid coordinates (0.0 to 1.0)
               const normX = centroidX / w;
@@ -421,7 +502,7 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
             {/* Top-Left: Live Camera Status */}
             <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-mono text-white border border-white/10">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Vision Online (15 FPS)</span>
+              <span>Vision Online ({visionEngineLabel})</span>
             </div>
 
             {/* Top-Right: Measured Eye Contact Gauge & Demeanor */}

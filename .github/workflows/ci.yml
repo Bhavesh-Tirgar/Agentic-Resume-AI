@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  backend-tests:
-    name: Django API & AI Integration Tests
+  backend-tests-and-eval:
+    name: Django Tests & CareerPilot Golden Eval Gate
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,17 +34,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Django system checks and full test suite
+      - name: Run Django system checks, full test suite & CareerPilot Golden Eval Gate
         env:
           DEBUG: "True"
           USE_POSTGRES: "false"
           GEMINI_API_KEY: ""
         run: |
           python manage.py check
+          python manage.py migrate --noinput
           python manage.py test Authentication Resume AI
+          python manage.py run_llm_eval
 
-  frontend-build:
-    name: Next.js TypeScript & Production Build
+  frontend-build-and-e2e:
+    name: Next.js Build & Playwright Headless E2E Smoke
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -67,3 +69,16 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000/api
         run: npm run build
+
+      - name: Install Playwright Chromium & execute E2E browser smoke suite
+        run: |
+          npm install --no-save playwright
+          npx playwright install chromium
+          npx next start -p 3000 &
+          SERVER_PID=$!
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/studio > /dev/null; then break; fi
+            sleep 1
+          done
+          node e2e/smoke.mjs
+          kill $SERVER_PID || true

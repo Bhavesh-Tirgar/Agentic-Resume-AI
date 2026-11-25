@@ -1,6 +1,9 @@
 import math
+import os
 import hashlib
 from typing import Tuple, Dict, Any, List, Optional
+import requests
+from django.core.cache import cache
 
 
 CITY_CENTROIDS: Dict[str, Tuple[float, float]] = {
@@ -115,6 +118,52 @@ class GeoCommuteEngine:
         }
 
     @classmethod
+    def estimate_road_commute(
+        cls,
+        lat1: float,
+        lon1: float,
+        lat2: float,
+        lon2: float,
+        is_remote: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Optionally queries cached OSRM road-network routing when USE_REAL_OSRM_ROUTING=true,
+        seamlessly falling back to great-circle Haversine estimation when disabled or offline.
+        """
+        haversine_km = cls.haversine_distance_km(lat1, lon1, lat2, lon2)
+        if is_remote or haversine_km <= 0.2:
+            return cls.estimate_commute(0.0, is_remote=True)
+
+        use_osrm = os.getenv("USE_REAL_OSRM_ROUTING", "false").lower() in ("true", "1")
+        if use_osrm:
+            cache_key = f"osrm_route:{round(lat1, 3)},{round(lon1, 3)}:{round(lat2, 3)},{round(lon2, 3)}"
+            cached = cache.get(cache_key)
+            if cached:
+                return cached
+            try:
+                base_url = os.getenv("OSRM_BASE_URL", "https://router.project-osrm.org").rstrip("/")
+                url = f"{base_url}/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=false"
+                resp = requests.get(url, timeout=2.0)
+                resp.raise_for_status()
+                routes = resp.json().get("routes", [])
+                if routes:
+                    road_km = round(routes[0]["distance"] / 1000.0, 1)
+                    drive_mins = max(5, int(round(routes[0]["duration"] / 60.0)))
+                    transit_mins = int(round(8 + road_km * 2.4))
+                    result = {
+                        "distance_km": road_km,
+                        "transit": f"{transit_mins} min via Metro / Transit",
+                        "driving": f"{drive_mins} min driving (road route)",
+                        "summary": f"{road_km} km · {transit_mins} min via Metro · {drive_mins} min driving",
+                    }
+                    cache.set(cache_key, result, timeout=6 * 3600)
+                    return result
+            except Exception:
+                pass
+
+        return cls.estimate_commute(haversine_km, is_remote=False)
+
+    @classmethod
     def enrich_job_with_geo(
         cls,
         job_dict: dict,
@@ -152,8 +201,7 @@ class GeoCommuteEngine:
 
         job_lat = round(cand_lat + deg_lat, 4)
         job_lng = round(cand_lng + deg_lng, 4)
-        actual_dist = cls.haversine_distance_km(cand_lat, cand_lng, job_lat, job_lng)
-        commute = cls.estimate_commute(actual_dist, is_remote=False)
+        commute = cls.estimate_road_commute(cand_lat, cand_lng, job_lat, job_lng, is_remote=False)
 
         job_dict["latitude"] = job_lat
         job_dict["longitude"] = job_lng

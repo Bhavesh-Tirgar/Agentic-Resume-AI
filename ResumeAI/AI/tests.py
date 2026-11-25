@@ -693,3 +693,52 @@ class AITests(TestCase):
         self.assertEqual(payload["session_id"], sess["session_id"])
         self.assertIn("latency_ms", payload)
         self.assertGreater(payload["evaluation"]["star_score"], 50)
+
+    def test_remote_whisper_offload_and_osrm_road_routing(self):
+        """Test WhisperAudioService GPU remote offload and GeoCommuteEngine cached OSRM road routing"""
+        import os
+        from django.core.cache import cache
+        from AI.Services.WhisperAudioService import WhisperAudioService
+        from AI.Utils.GeoCommuteEngine import GeoCommuteEngine
+
+        cache.clear()
+        with patch("requests.post") as mock_post, patch.dict(
+            os.environ,
+            {"WHISPER_REMOTE_URL": "https://gpu-whisper.internal/v1/audio/transcriptions", "WHISPER_REMOTE_API_KEY": "secret-tok"},
+        ):
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json.return_value = {"text": "Engineered low-latency gRPC audio streaming."}
+            mock_post.return_value.raise_for_status.return_value = None
+
+            out = WhisperAudioService.transcribe(b"mock-webm-audio")
+            self.assertEqual(out, "Engineered low-latency gRPC audio streaming.")
+            self.assertEqual(mock_post.call_count, 1)
+
+        with patch("AI.Utils.GeoCommuteEngine.requests.get") as mock_get, patch.dict(
+            os.environ,
+            {"USE_REAL_OSRM_ROUTING": "true"},
+        ):
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.json.return_value = {
+                "routes": [{"distance": 14200.0, "duration": 1560.0}]
+            }
+            mock_get.return_value.raise_for_status.return_value = None
+
+            first = GeoCommuteEngine.estimate_road_commute(12.9716, 77.5946, 12.9352, 77.6245)
+            second = GeoCommuteEngine.estimate_road_commute(12.9716, 77.5946, 12.9352, 77.6245)
+            self.assertEqual(first["distance_km"], 14.2)
+            self.assertIn("26 min driving", first["driving"])
+            self.assertEqual(second["distance_km"], 14.2)
+            self.assertEqual(mock_get.call_count, 1)  # Second served from Django cache
+
+    def test_celery_task_fallback_wrappers(self):
+        """Test AI Celery tasks execute cleanly via fallback/direct invocation"""
+        from AI.tasks import process_resume_task
+        with patch("AI.Services.ResumeProcessService.run_resume_graph") as mock_graph:
+            mock_graph.return_value = {
+                "parsed_resume": self.mock_parsed,
+                "analysis": self.mock_analysis,
+                "score": self.mock_score,
+            }
+            res = process_resume_task(self.resume.id)
+            self.assertEqual(res["resume_id"], self.resume.id)

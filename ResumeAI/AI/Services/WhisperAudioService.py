@@ -83,13 +83,51 @@ class WhisperAudioService:
         return audio_source
 
     @classmethod
+    def _transcribe_remote(cls, raw_bytes: bytes) -> Optional[str]:
+        """Offloads Whisper transcription to external GPU/API endpoint when WHISPER_REMOTE_URL is set."""
+        remote_url = os.getenv("WHISPER_REMOTE_URL", "").strip()
+        if not remote_url:
+            return None
+
+        try:
+            import requests
+            headers = {}
+            api_key = os.getenv("WHISPER_REMOTE_API_KEY", "").strip()
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+
+            resp = requests.post(
+                remote_url,
+                headers=headers,
+                files={"file": ("audio.webm", raw_bytes, "audio/webm")},
+                data={"model": os.getenv("WHISPER_REMOTE_MODEL", "whisper-1"), "language": "en"},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+            text = (payload.get("text") or payload.get("transcription") or "").strip()
+            logger.info("Remote Whisper offloaded %d chars cleanly.", len(text))
+            return text
+        except Exception as exc:
+            logger.warning("Remote Whisper offload failed (%s), falling back to local CPU worker.", exc)
+            return None
+
+    @classmethod
     def transcribe(cls, audio_source: Union[str, bytes, BinaryIO]) -> str:
         """
         Transcribes audio from a file path, raw bytes, or file-like object.
-        Enforces semaphore queueing around full inference and fail-fast payload bounds.
-        Returns the clean, transcribed text.
+        Prefers non-blocking GPU/remote endpoint when WHISPER_REMOTE_URL is configured;
+        otherwise acquires semaphore lock for bounded CPU scheduling.
         """
         file_to_transcribe = cls._coerce_audio_input(audio_source)
+
+        # Fast-path GPU/Remote Offload without touching local WSGI CPU threads
+        if isinstance(file_to_transcribe, io.BytesIO):
+            raw_bytes = file_to_transcribe.getvalue()
+            remote_text = cls._transcribe_remote(raw_bytes)
+            if remote_text is not None:
+                return remote_text
+            file_to_transcribe.seek(0)
 
         acquired = _WHISPER_SEMAPHORE.acquire(timeout=cls.SEMAPHORE_TIMEOUT_SEC)
         if not acquired:
