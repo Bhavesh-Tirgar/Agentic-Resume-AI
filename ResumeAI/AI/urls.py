@@ -6,6 +6,7 @@ from .views import (
     JobDiscoveryView,
     VirtualHRStartView,
     VirtualHRTurnView,
+    VirtualHRTurnStreamView,
     VirtualHRFinishView,
     VirtualHRSessionView,
     VirtualHRHistoryView,
@@ -23,6 +24,7 @@ urlpatterns = [
     # Virtual HR Real-Time Mock Interview Endpoints
     path("interview/live/start/", VirtualHRStartView.as_view(), name="virtual-hr-start"),
     path("interview/live/turn/", VirtualHRTurnView.as_view(), name="virtual-hr-turn"),
+    path("interview/live/turn/stream/", VirtualHRTurnStreamView.as_view(), name="virtual-hr-turn-stream"),
     path("interview/live/finish/", VirtualHRFinishView.as_view(), name="virtual-hr-finish"),
     path("interview/live/session/<str:session_id>/", VirtualHRSessionView.as_view(), name="virtual-hr-session"),
     path("interview/live/history/", VirtualHRHistoryView.as_view(), name="virtual-hr-history"),

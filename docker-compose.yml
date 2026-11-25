@@ -33,6 +33,51 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: ./ResumeAI
+      dockerfile: Dockerfile
+    container_name: resumeai_backend
+    profiles: ["fullstack"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: "${SECRET_KEY:-careerpilot-compose-change-in-prod-9831a}"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,backend"
+      USE_POSTGRES: "true"
+      DB_NAME: resumeai
+      DB_USER: resumeai_user
+      DB_PASSWORD: resumeai_secure_pass_2026
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_CONN_MAX_AGE: "60"
+      USE_REDIS_CACHE: "true"
+      REDIS_URL: redis://redis:6379/0
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      ADZUNA_APP_ID: "${ADZUNA_APP_ID:-}"
+      ADZUNA_APP_KEY: "${ADZUNA_APP_KEY:-}"
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./resume-ai-next
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8000/api}"
+    container_name: resumeai_frontend
+    profiles: ["fullstack"]
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
 volumes:
   pgdata:
     driver: local

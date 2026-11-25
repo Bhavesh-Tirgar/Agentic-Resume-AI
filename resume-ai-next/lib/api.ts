@@ -1,9 +1,9 @@
 /**
  * Full-Featured Resilient API Client for Agentic Resume AI
- * Connects Next.js Frontend directly to Django REST Framework backend on http://localhost:8000/api
+ * Connects Next.js Frontend to Django REST Framework backend via NEXT_PUBLIC_API_URL
  */
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace(/\/+$/, "");
 
 export const getAuthToken = (): string | null => {
   if (typeof window === "undefined") return null;
@@ -480,6 +480,89 @@ export async function sendVirtualHRAnswerApi(payload: {
   }
 
   return res.json();
+}
+
+export async function sendVirtualHRAnswerStreamApi(
+  payload: Parameters<typeof sendVirtualHRAnswerApi>[0],
+  onProgress?: (event: { stage?: string; transcribed_text?: string; message?: string }) => void
+): Promise<ReturnType<typeof sendVirtualHRAnswerApi>> {
+  let body: BodyInit;
+  let isFormData = false;
+
+  if (payload.audio_blob) {
+    isFormData = true;
+    const formData = new FormData();
+    formData.append("session_id", payload.session_id);
+    if (payload.candidate_answer) formData.append("candidate_answer", payload.candidate_answer);
+    formData.append("audio", payload.audio_blob, "turn_recording.webm");
+    if (payload.snapshot_base64) formData.append("snapshot_base64", payload.snapshot_base64);
+    if (payload.vision_telemetry) formData.append("vision_telemetry", JSON.stringify(payload.vision_telemetry));
+    body = formData;
+  } else {
+    body = JSON.stringify(payload);
+  }
+
+  const res = await fetchWithAuth(
+    "/ai/interview/live/turn/stream/",
+    { method: "POST", body },
+    isFormData
+  );
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to evaluate answer stream");
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("text/event-stream") || !res.body) {
+    return res.json();
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalResult: any = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() || "";
+
+    for (const block of blocks) {
+      let eventType = "message";
+      let dataStr = "";
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event:")) {
+          eventType = line.slice(6).trim();
+        } else if (line.startsWith("data:")) {
+          dataStr += line.slice(5).trim();
+        }
+      }
+      if (!dataStr) continue;
+      try {
+        const parsed = JSON.parse(dataStr);
+        if (eventType === "error") {
+          throw new Error(parsed.error || "Streaming evaluation error");
+        } else if (eventType === "result") {
+          finalResult = parsed;
+        } else {
+          onProgress?.(parsed);
+        }
+      } catch (e: any) {
+        if (e?.message?.includes("Streaming evaluation error") || eventType === "error") {
+          throw e;
+        }
+      }
+    }
+  }
+
+  if (!finalResult) {
+    throw new Error("Stream ended without a final evaluation payload.");
+  }
+  return finalResult;
 }
 
 export async function finishVirtualHRInterviewApi(session_id: string): Promise<{

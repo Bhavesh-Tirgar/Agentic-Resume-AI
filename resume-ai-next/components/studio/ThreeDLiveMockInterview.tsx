@@ -5,6 +5,7 @@ import { AlertTriangle, ChevronRight, MessageSquare, Mic, Play, Radio, RefreshCw
 import { 
   startVirtualHRInterviewApi, 
   sendVirtualHRAnswerApi, 
+  sendVirtualHRAnswerStreamApi,
   finishVirtualHRInterviewApi, 
   getActiveResumeId 
 } from "@/lib/api";
@@ -51,6 +52,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
   const [currentQuestion, setCurrentQuestion] = useState<string>("");
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [processingStage, setProcessingStage] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   
   // 3D Avatar state
@@ -246,39 +248,55 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
     }
   }, [sessionId, isFinishing, onFinish]);
 
-  // Dispatch turn answer (supports binary audio blob streaming, direct text, or fallback audio base64)
+  // Dispatch turn answer via progressive SSE stream (with automatic REST fallback)
   const dispatchTurnAnswer = useCallback(async ({ textAnswer, audioBlob, audioBase64 }: { textAnswer?: string; audioBlob?: Blob; audioBase64?: string }) => {
     if (!sessionId || isSubmitting) return;
 
     setIsSubmitting(true);
+    setProcessingStage(audioBlob || audioBase64 ? "Transcribing audio with Whisper..." : "Marcus is reviewing your answer...");
     setAvatarState("thinking");
     const isCamOn = cameraRef.current?.isCameraActive?.() ?? false;
     const snapshot = isCamOn ? cameraRef.current?.captureSnapshot() : null;
     const liveVision = isCamOn ? cameraRef.current?.getLiveTelemetry?.() : null;
 
+    const payload = {
+      session_id: sessionId,
+      candidate_answer: textAnswer,
+      audio_blob: audioBlob,
+      audio_base64: audioBase64,
+      snapshot_base64: snapshot || undefined,
+      vision_telemetry: isCamOn && liveVision ? {
+        camera_active: true,
+        eye_contact_percentage: liveVision.eye_contact_percentage,
+        confidence_score: liveVision.confidence_score,
+        nervousness_score: liveVision.nervousness_score,
+        gaze_direction: liveVision.gaze_direction,
+        facial_demeanor: liveVision.facial_demeanor
+      } : {
+        camera_active: false,
+        eye_contact_percentage: 0,
+        confidence_score: 20,
+        nervousness_score: 0,
+        gaze_direction: "Camera Off / Disabled",
+        facial_demeanor: "Camera Off"
+      }
+    };
+
     try {
-      const res = await sendVirtualHRAnswerApi({
-        session_id: sessionId,
-        candidate_answer: textAnswer,
-        audio_blob: audioBlob,
-        audio_base64: audioBase64,
-        snapshot_base64: snapshot || undefined,
-        vision_telemetry: isCamOn && liveVision ? {
-          camera_active: true,
-          eye_contact_percentage: liveVision.eye_contact_percentage,
-          confidence_score: liveVision.confidence_score,
-          nervousness_score: liveVision.nervousness_score,
-          gaze_direction: liveVision.gaze_direction,
-          facial_demeanor: liveVision.facial_demeanor
-        } : {
-          camera_active: false,
-          eye_contact_percentage: 0,
-          confidence_score: 20,
-          nervousness_score: 0,
-          gaze_direction: "Camera Off / Disabled",
-          facial_demeanor: "Camera Off"
-        }
-      });
+      let res: Awaited<ReturnType<typeof sendVirtualHRAnswerApi>>;
+      try {
+        res = await sendVirtualHRAnswerStreamApi(payload, (evt) => {
+          if (evt.transcribed_text) {
+            setCurrentAnswer(evt.transcribed_text);
+          }
+          if (evt.message) {
+            setProcessingStage(evt.message);
+          }
+        });
+      } catch (streamErr: any) {
+        // Fallback to standard single-shot REST if streaming endpoint rejected/unavailable
+        res = await sendVirtualHRAnswerApi(payload);
+      }
 
       const resolvedAnswerText = res.transcribed_text || textAnswer || (audioBlob || audioBase64 ? "Spoken response submitted" : "");
 
@@ -339,6 +357,7 @@ export function ThreeDLiveMockInterview({ activeResumeId, initialRole, onFinish 
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
+      setProcessingStage(null);
     }
   }, [sessionId, isSubmitting, isHandsFree, handleFinishInterview, playNeuralAudio]);
 
@@ -813,6 +832,14 @@ ${turns.map((t, i) => `### Question ${i + 1}\n**${t.question}**\n\n**Your Answer
         onStopSpeaking={handleStopSpeaking}
         onReplayAudio={handleReplayAudio}
       />
+
+      {/* Live SSE Pipeline Progress Pill */}
+      {processingStage && (
+        <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono text-emerald-700 dark:text-emerald-300">
+          <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-500 shrink-0" />
+          <span>{processingStage}</span>
+        </div>
+      )}
 
       {/* Candidate Controls Bar */}
       <InterviewControlsBar

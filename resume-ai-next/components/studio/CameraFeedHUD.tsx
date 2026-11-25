@@ -191,7 +191,19 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
               }
             }
 
-            if (skinPixelCount > 80) {
+            // Guard against blank/background wash walls triggered across >65% of sampled pixels
+            const sampledCount = Math.ceil(maxYBound / 4) * Math.ceil(w / 4);
+            const skinCoverageRatio = skinPixelCount / Math.max(1, sampledCount);
+            const boxWidthRatio = (maxX - minX) / Math.max(1, w);
+            const boxHeightRatio = (maxY - minY) / Math.max(1, h);
+            const hasCompactFaceRegion = (
+              skinPixelCount > 80 &&
+              skinCoverageRatio < 0.65 &&
+              boxWidthRatio > 0.08 &&
+              boxHeightRatio > 0.08
+            );
+
+            if (hasCompactFaceRegion) {
               const centroidX = sumX / skinPixelCount;
               const centroidY = sumY / skinPixelCount;
 

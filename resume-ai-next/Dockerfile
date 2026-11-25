@@ -1,4 +1,4 @@
-# Production Dockerfile for ResumeAI Next.js 14 Frontend
+# Production Dockerfile for CareerPilot Next.js 14 Frontend
 FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
@@ -11,6 +11,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . ./
 
+# Ensure public directory exists even if static assets folder is omitted
+RUN mkdir -p /app/public
+
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000/api
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 

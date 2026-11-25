@@ -1,5 +1,6 @@
 import json
 import time
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -396,6 +397,44 @@ class VirtualHRStartView(APIView):
             return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def _parse_and_authorize_turn_request(request):
+    """Shared input parsing, FormData JSON normalization, and ownership authorization for turn views."""
+    session_id = request.data.get("session_id")
+    candidate_answer = request.data.get("candidate_answer", "")
+    audio_file = request.FILES.get("audio")
+    audio_base64 = request.data.get("audio_base64")
+    raw_telemetry = request.data.get("vision_telemetry")
+    snapshot_base64 = request.data.get("snapshot_base64")
+
+    if not session_id:
+        return None, Response({"error": "session_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if isinstance(raw_telemetry, str):
+        try:
+            vision_telemetry = json.loads(raw_telemetry)
+        except Exception:
+            vision_telemetry = {}
+    else:
+        vision_telemetry = raw_telemetry
+
+    if not audio_file and not audio_base64 and not str(candidate_answer).strip():
+        return None, Response({"error": "Audio recording or text answer is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    from AI.Services.InterviewSessionManager import session_manager
+    existing = session_manager.get_session(session_id)
+    if existing and not _is_session_authorized(request, existing):
+        return None, Response({"error": "Not authorized to access this interview session."}, status=status.HTTP_403_FORBIDDEN)
+
+    return {
+        "session_id": session_id,
+        "candidate_answer": candidate_answer,
+        "audio_file": audio_file,
+        "audio_base64": audio_base64,
+        "vision_telemetry": vision_telemetry,
+        "snapshot_base64": snapshot_base64,
+    }, None
+
+
 class VirtualHRTurnView(APIView):
     """Processes a candidate answer via Whisper audio transcription or direct text, returning STAR critique and next question."""
     permission_classes = [AllowAny]
@@ -403,43 +442,20 @@ class VirtualHRTurnView(APIView):
 
     def post(self, request):
         t0 = time.perf_counter()
-        session_id = request.data.get("session_id")
-        candidate_answer = request.data.get("candidate_answer", "")
-        audio_file = request.FILES.get("audio")
-        audio_base64 = request.data.get("audio_base64")
-        raw_telemetry = request.data.get("vision_telemetry")
-        snapshot_base64 = request.data.get("snapshot_base64")
-
-        if not session_id:
-            return Response({"error": "session_id is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Normalize FormData JSON-stringified telemetry
-        if isinstance(raw_telemetry, str):
-            try:
-                vision_telemetry = json.loads(raw_telemetry)
-            except Exception:
-                vision_telemetry = {}
-        else:
-            vision_telemetry = raw_telemetry
-
-        if not audio_file and not audio_base64 and not str(candidate_answer).strip():
-            return Response({"error": "Audio recording or text answer is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        from AI.Services.InterviewSessionManager import session_manager
-        existing = session_manager.get_session(session_id)
-        if existing and not _is_session_authorized(request, existing):
-            return Response({"error": "Not authorized to access this interview session."}, status=status.HTTP_403_FORBIDDEN)
+        parsed, error_resp = _parse_and_authorize_turn_request(request)
+        if error_resp is not None:
+            return error_resp
 
         try:
             from AI.Services.InterviewAgent import InterviewAgent
             agent = InterviewAgent()
             result = agent.process_turn(
-                session_id=session_id,
-                audio_file=audio_file,
-                audio_base64=audio_base64,
-                text_answer=candidate_answer,
-                client_telemetry=vision_telemetry,
-                snapshot_base64=snapshot_base64
+                session_id=parsed["session_id"],
+                audio_file=parsed["audio_file"],
+                audio_base64=parsed["audio_base64"],
+                text_answer=parsed["candidate_answer"],
+                client_telemetry=parsed["vision_telemetry"],
+                snapshot_base64=parsed["snapshot_base64"],
             )
             result["latency_ms"] = int((time.perf_counter() - t0) * 1000)
             return Response(result, status=status.HTTP_200_OK)
@@ -447,13 +463,70 @@ class VirtualHRTurnView(APIView):
             return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except ValueError as exc:
             err_msg = str(exc)
-            if "not found" in err_msg.lower():
-                code = status.HTTP_404_NOT_FOUND
-            else:
-                code = status.HTTP_400_BAD_REQUEST
+            code = status.HTTP_404_NOT_FOUND if "not found" in err_msg.lower() else status.HTTP_400_BAD_REQUEST
             return Response({"error": err_msg}, status=code)
         except Exception as exc:
             return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class VirtualHRTurnStreamView(APIView):
+    """
+    Server-Sent Events (SSE) endpoint streaming real-time Whisper transcription
+    before STAR evaluation & neural TTS complete, cutting perceived wait latency.
+    """
+    permission_classes = [AllowAny]
+    throttle_scope = "virtual_hr_turn"
+
+    @staticmethod
+    def _format_sse(event: str, payload: dict) -> str:
+        return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
+
+    def post(self, request):
+        t0 = time.perf_counter()
+        parsed, error_resp = _parse_and_authorize_turn_request(request)
+        if error_resp is not None:
+            return error_resp
+
+        def event_stream():
+            from AI.Services.InterviewAgent import InterviewAgent
+            from AI.Services.VirtualHRService import VirtualHRService
+
+            try:
+                if parsed["audio_file"] or parsed["audio_base64"]:
+                    yield self._format_sse("stage", {"stage": "transcribing", "message": "Transcribing audio with Whisper..."})
+
+                resolved_answer, used_whisper = InterviewAgent.resolve_answer(
+                    audio_file=parsed["audio_file"],
+                    audio_base64=parsed["audio_base64"],
+                    text_answer=parsed["candidate_answer"],
+                )
+
+                yield self._format_sse("transcript", {
+                    "stage": "evaluating",
+                    "transcribed_text": resolved_answer,
+                    "used_whisper": used_whisper,
+                    "message": "Evaluating STAR technical depth...",
+                })
+
+                service = VirtualHRService()
+                result = service.evaluate_turn(
+                    session_id=parsed["session_id"],
+                    candidate_answer=resolved_answer,
+                    client_telemetry=parsed["vision_telemetry"],
+                    snapshot_base64=parsed["snapshot_base64"],
+                )
+                result["transcribed_text"] = resolved_answer
+                result["used_whisper"] = used_whisper
+                result["latency_ms"] = int((time.perf_counter() - t0) * 1000)
+
+                yield self._format_sse("result", result)
+            except Exception as exc:
+                yield self._format_sse("error", {"error": str(exc)})
+
+        resp = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+        resp["Cache-Control"] = "no-cache"
+        resp["X-Accel-Buffering"] = "no"
+        return resp
 
 
 class WhisperTranscribeView(APIView):

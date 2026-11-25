@@ -1,11 +1,13 @@
+import concurrent.futures
 import re
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from AI.Services.GeminiService import GeminiService
 from AI.Services.InterviewSessionManager import session_manager
 from AI.Services.CandidateVisionService import CandidateVisionService
+from AI.Utils.PromptInjectionGuardrail import PromptInjectionGuardrail
 from AI.Schemas.VirtualHRSchema import (
     InterviewTurnEvaluation,
     InterviewFinalScorecard,
@@ -60,6 +62,17 @@ class VirtualHRService:
             self.llm = self.gemini_service.get_llm()
             self.turn_evaluator = self.llm.with_structured_output(InterviewTurnEvaluation)
             self.scorecard_compiler = self.llm.with_structured_output(InterviewFinalScorecard)
+
+    @staticmethod
+    def _synthesize_voice_safe(spoken_text: Optional[str]) -> Optional[str]:
+        if not spoken_text:
+            return None
+        try:
+            from AI.Services.RealVoiceService import RealVoiceService
+            return RealVoiceService.synthesize_to_base64(spoken_text)
+        except Exception as e:
+            logger.warning("Could not synthesize Virtual HR voice: %s", e)
+            return None
 
     @classmethod
     def _has_profanity(cls, text: str) -> bool:
@@ -149,14 +162,7 @@ class VirtualHRService:
             f"Hey {resolved_name}, great to meet you! Thanks for hopping on today. To get us rolling, tell me a bit about what you've been focused on recently, and walk me through a key project you're really proud of."
         )
 
-        audio_b64 = None
-        try:
-            from AI.Services.RealVoiceService import RealVoiceService
-            audio_b64 = RealVoiceService.synthesize_to_base64(first_question)
-        except Exception as e:
-            logger.warning("Could not synthesize opening voice: %s", e)
-
-        # Store initial question and candidate summary in session state
+        # Store initial state while synthesizing opening voice concurrently
         session["candidate_summary"] = candidate_summary
         session["current_question"] = first_question
         session["turns"].append({
@@ -166,7 +172,12 @@ class VirtualHRService:
             "evaluation": None,
             "timestamp": time.time()
         })
-        session_manager.save_session(session["session_id"], session)
+
+        audio_b64 = None
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            audio_future = pool.submit(self._synthesize_voice_safe, first_question)
+            session_manager.save_session(session["session_id"], session)
+            audio_b64 = audio_future.result(timeout=12.0)
 
         return {
             "session_id": session["session_id"],
@@ -185,7 +196,8 @@ class VirtualHRService:
         session_id: str,
         candidate_answer: str,
         client_telemetry: Optional[Dict[str, Any]] = None,
-        snapshot_base64: Optional[str] = None
+        snapshot_base64: Optional[str] = None,
+        progress_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """
         Evaluates the candidate's answer for the current round and generates
@@ -233,14 +245,23 @@ class VirtualHRService:
         elif is_explicit_junior and not is_explicit_senior:
             candidate_summary += " | SENIORITY: Junior / Fresher / Student. Calibrate questions to fundamentals, core algorithms, and personal projects. Be conversational, supportive, and provide hints if they get stuck."
 
+        wrapped_summary = PromptInjectionGuardrail.wrap_delimited_corpus(
+            candidate_summary,
+            tag_name="untrusted_candidate_summary",
+        )
+        wrapped_answer = PromptInjectionGuardrail.wrap_delimited_corpus(
+            candidate_answer.strip()[:3000],
+            tag_name="untrusted_candidate_answer",
+        )
+
         prompt_text = VIRTUAL_HR_EVALUATION_PROMPT.format(
             candidate_name=candidate_name,
             target_role=target_role,
-            candidate_summary=candidate_summary,
+            candidate_summary=wrapped_summary,
             current_round=current_round,
             max_rounds=max_rounds,
             last_question=last_question,
-            candidate_answer=candidate_answer.strip()[:3000],
+            candidate_answer=wrapped_answer,
             history_summary=history_summary,
             eye_contact_pct=vision_metrics.eye_contact_percentage,
             confidence_score=vision_metrics.confidence_score,
@@ -285,17 +306,17 @@ class VirtualHRService:
             session["status"] = "completed"
 
         session["turns"] = turns
-        session_manager.save_session(session_id, session)
-
         next_q = eval_result.hr_followup_or_next_question if not is_finished else None
         spoken_dialogue = next_q or eval_result.critique
-        audio_b64 = None
-        if spoken_dialogue:
-            try:
-                from AI.Services.RealVoiceService import RealVoiceService
-                audio_b64 = RealVoiceService.synthesize_to_base64(spoken_dialogue)
-            except Exception as e:
-                logger.warning("Could not synthesize follow-up voice: %s", e)
+
+        if progress_callback:
+            progress_callback("stage", {"stage": "synthesizing", "message": "Synthesizing Marcus Vance voice..."})
+
+        # Overlap network TTS synthesis concurrently while saving DB/Redis state on request thread
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            audio_future = pool.submit(self._synthesize_voice_safe, spoken_dialogue)
+            session_manager.save_session(session_id, session)
+            audio_b64 = audio_future.result(timeout=12.0)
 
         return {
             "session_id": session_id,
@@ -345,11 +366,15 @@ class VirtualHRService:
             )
 
         full_transcript = "\n\n".join(transcript_parts) if transcript_parts else "Brief single-turn interview."
+        wrapped_transcript = PromptInjectionGuardrail.wrap_delimited_corpus(
+            full_transcript,
+            tag_name="untrusted_interview_transcript",
+        )
 
         prompt_text = VIRTUAL_HR_SCORECARD_PROMPT.format(
             candidate_name=candidate_name,
             target_role=target_role,
-            full_transcript=full_transcript
+            full_transcript=wrapped_transcript
         )
 
         try:

@@ -652,3 +652,44 @@ class AITests(TestCase):
         res = self.client.get(reverse("resume-process", kwargs={"resume_id": 99999}))
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(Resume.objects.count(), before_count)
+
+    def test_virtual_hr_turn_sse_stream_and_nonce_guardrail(self):
+        """Test /api/ai/interview/live/turn/stream/ emits SSE transcript & result events and wraps prompts with nonces"""
+        import json
+        from unittest.mock import MagicMock
+        from AI.Services.InterviewSessionManager import session_manager
+        from AI.Services.VirtualHRService import VirtualHRService
+
+        sess = session_manager.create_session(candidate_name="Stream User", target_role="Platform Engineer", user_id=self.user.id)
+        sess["current_question"] = "Describe a scaling challenge."
+        sess["turns"] = [{"round": 1, "question": "Describe a scaling challenge.", "answer": None, "evaluation": None}]
+        session_manager.save_session(sess["session_id"], sess)
+
+        # Verify nonce wrapping occurs cleanly on LLM invocation
+        vhr = VirtualHRService()
+        mock_eval = MagicMock()
+        vhr.turn_evaluator = mock_eval
+        vhr.scorecard_compiler = MagicMock()
+        mock_eval.invoke.side_effect = RuntimeError("mock offline")
+        vhr.evaluate_turn(sess["session_id"], "We scaled PostgreSQL read replicas across 3 AZs achieving 99.99% uptime.")
+        prompt_sent = mock_eval.invoke.call_args[0][0]
+        self.assertIn("<untrusted_candidate_answer_", prompt_sent)
+        self.assertIn("<untrusted_candidate_summary_", prompt_sent)
+
+        # Verify SSE streaming endpoint emits stage/transcript & final result
+        stream_url = reverse("virtual-hr-turn-stream")
+        res = self.client.post(stream_url, {
+            "session_id": sess["session_id"],
+            "candidate_answer": "We introduced Redis connection pooling and reduced database load by 62%.",
+        })
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("text/event-stream", res["Content-Type"])
+        body_text = b"".join(res.streaming_content).decode("utf-8")
+        self.assertIn("event: transcript", body_text)
+        self.assertIn("event: result", body_text)
+        # Extract result JSON line
+        result_line = [line for line in body_text.splitlines() if line.startswith("data:")][-1]
+        payload = json.loads(result_line[5:].strip())
+        self.assertEqual(payload["session_id"], sess["session_id"])
+        self.assertIn("latency_ms", payload)
+        self.assertGreater(payload["evaluation"]["star_score"], 50)
