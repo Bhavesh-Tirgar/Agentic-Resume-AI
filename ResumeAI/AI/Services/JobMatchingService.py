@@ -52,9 +52,9 @@ def build_heuristic_job_match(resume_schema: ResumeSchema, job_title: str, job_d
     if not all_target_requirements:
         all_target_requirements = [job_title, "API Development", "System Design"]
 
-    # Partition into Must-Have (top 3 core) and Nice-To-Have
-    must_haves = all_target_requirements[:3]
-    nice_to_haves = all_target_requirements[3:8] or all_target_requirements[:1]
+    # Partition into Must-Have (top 3 core, ensuring top missing gaps are not masked by matched skills) and Nice-To-Have
+    must_haves = list(dict.fromkeys(matched_skills[:2] + missing_skills[:2] + all_target_requirements[:3]))[:4]
+    nice_to_haves = [r for r in all_target_requirements if r not in must_haves][:5] or all_target_requirements[:1]
 
     has_critical_missing_must_have = False
     adjacent_matches: List[Tuple[str, str]] = []
