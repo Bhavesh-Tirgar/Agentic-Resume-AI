@@ -2,8 +2,10 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 
+from Authentication.models import UserResumeQuota
 from .models import Resume
 from .serializers import ResumeUploadSerializer
 from .Utils.pdfExtractor import extract_text_from_pdf
@@ -29,6 +31,21 @@ class ResumeUploadView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
     def post(self, request):
+        quota, _ = UserResumeQuota.objects.get_or_create(user=request.user)
+        if not quota.can_upload():
+            return Response(
+                {
+                    "code": "QUOTA_EXCEEDED",
+                    "message": (
+                        f"Your {UserResumeQuota.free_limit()} free resume scan has been used. "
+                        f"Unlock an additional scan at cost (₹{UserResumeQuota.unlock_price_inr()} / "
+                        f"${UserResumeQuota.unlock_price_usd():.2f}) to cover AI & OCR compute."
+                    ),
+                    **quota.to_dict(),
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
         serializer = ResumeUploadSerializer(data=request.data)
 
         if not serializer.is_valid():
@@ -71,12 +88,22 @@ class ResumeUploadView(APIView):
             resume.status = "Completed"
             resume.save()
 
+            with transaction.atomic():
+                locked_quota, _ = UserResumeQuota.objects.select_for_update().get_or_create(user=request.user)
+                if locked_quota.free_resumes_used < UserResumeQuota.free_limit():
+                    locked_quota.free_resumes_used += 1
+                    locked_quota.save(update_fields=["free_resumes_used", "updated_at"])
+                elif locked_quota.paid_resume_credits > 0:
+                    locked_quota.paid_resume_credits -= 1
+                    locked_quota.save(update_fields=["paid_resume_credits", "updated_at"])
+
             return Response(
                 {
                     "message": "Resume uploaded successfully.",
                     "resume_id": resume.id,
                     "characters": len(text),
                     "status": resume.status,
+                    "quota": locked_quota.to_dict(),
                 },
                 status=status.HTTP_201_CREATED,
             )

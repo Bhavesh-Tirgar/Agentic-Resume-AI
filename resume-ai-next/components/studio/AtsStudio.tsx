@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { 
   CheckCircle2, AlertTriangle, Copy, Check, Target, 
   HelpCircle, Layers, Building2, UploadCloud, FileText, 
-  ArrowRight, Sparkles, RefreshCw, Server, AlertCircle, Download, FileDown
+  ArrowRight, Sparkles, RefreshCw, Server, AlertCircle, Download, FileDown,
+  Lock, CreditCard, X
 } from "lucide-react";
 import { AtsResultData, INITIAL_DOSSIER } from "@/lib/demoData";
 import { useTheme } from "../ThemeProvider";
@@ -14,7 +15,11 @@ import {
   processResumeApi, 
   checkBackendHealth,
   getResumeProcessResultApi,
-  getActiveResumeId 
+  getActiveResumeId,
+  getResumeQuotaApi,
+  unlockResumeCreditApi,
+  QuotaExceededError,
+  ResumeQuotaInfo
 } from "@/lib/api";
 
 interface AtsStudioProps {
@@ -123,6 +128,11 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
   const [backendStatus, setBackendStatus] = useState<"connected" | "checking" | "offline">("checking");
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"strengths" | "gaps" | "improvements">("strengths");
+  const [quota, setQuota] = useState<ResumeQuotaInfo | null>(null);
+  const [showPaywallModal, setShowPaywallModal] = useState(false);
+  const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { theme } = useTheme();
 
@@ -130,6 +140,10 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
     checkBackendHealth().then((res) => {
       setBackendStatus(res.status);
     });
+
+    getResumeQuotaApi()
+      .then((q) => setQuota(q))
+      .catch(() => {});
 
     const targetId = activeResumeId || getActiveResumeId();
     getResumeProcessResultApi(targetId)
@@ -238,16 +252,16 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
     URL.revokeObjectURL(url);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processUploadedFile = async (file: File) => {
     setIsScanning(true);
     setStatusNotice(null);
 
     try {
-      // 1. Upload to Django REST Framework backend
+      // 1. Upload to Django REST Framework backend (enforces 1-free-resume quota)
       const uploadRes = await uploadResumeApi(file);
+      if (uploadRes.quota) {
+        setQuota(uploadRes.quota);
+      }
       onResumeUploaded?.(uploadRes.resume_id);
       
       // 2. Trigger LangGraph Multi-Agent processing on backend
@@ -258,6 +272,14 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
       setStatusNotice(`Live API Success: Processed ${uploadRes.characters} characters via Django Backend!`);
       setBackendStatus("connected");
     } catch (err: any) {
+      if (err instanceof QuotaExceededError || err?.code === "QUOTA_EXCEEDED") {
+        setPendingUploadFile(file);
+        if (err.quota) setQuota(err.quota);
+        setUnlockError(null);
+        setShowPaywallModal(true);
+        setStatusNotice(err.message);
+        return;
+      }
       console.warn("Backend API call failed, falling back to preview simulation:", err);
       setStatusNotice(`Processed in Local Preview: ${err.message}`);
       setData({
@@ -271,6 +293,32 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
       });
     } finally {
       setIsScanning(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processUploadedFile(file);
+    e.target.value = "";
+  };
+
+  const handleUnlockCredit = async () => {
+    setIsUnlocking(true);
+    setUnlockError(null);
+    try {
+      const unlockRes = await unlockResumeCreditApi(1);
+      setQuota(unlockRes.quota);
+      setShowPaywallModal(false);
+      if (pendingUploadFile) {
+        const retryFile = pendingUploadFile;
+        setPendingUploadFile(null);
+        await processUploadedFile(retryFile);
+      }
+    } catch (err: any) {
+      setUnlockError(err.message || "Unlock failed.");
+    } finally {
+      setIsUnlocking(false);
     }
   };
 
@@ -336,6 +384,35 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
               </>
             )}
           </button>
+
+          {quota && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!quota.can_upload) {
+                  setUnlockError(null);
+                  setShowPaywallModal(true);
+                }
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium transition ${
+                quota.can_upload
+                  ? "border-emerald-200 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300"
+                  : "border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-950/25 text-amber-800 dark:text-amber-300 cursor-pointer hover:opacity-90"
+              }`}
+              title="First resume is free; additional scans are billed at cost to cover AI & OCR compute"
+            >
+              {quota.free_remaining > 0 ? (
+                <span>{quota.free_remaining} Free Scan Left</span>
+              ) : quota.paid_credits > 0 ? (
+                <span>{quota.paid_credits} Paid Credit{quota.paid_credits > 1 ? "s" : ""}</span>
+              ) : (
+                <>
+                  <Lock className="w-3 h-3" />
+                  <span>Unlock Scan (₹{quota.unlock_price_inr})</span>
+                </>
+              )}
+            </button>
+          )}
 
           {/* Template Selector Pill */}
           <div className="flex items-center rounded-lg border border-slate-200 dark:border-[#262c3b] bg-slate-100 dark:bg-[#191d27] p-0.5 text-xs">
@@ -772,6 +849,77 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
         </div>
 
       </div>
+
+      {/* At-Cost Unlock Modal (1 Free Resume Limit) */}
+      {showPaywallModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-[#262c3b] bg-white dark:bg-[#131722] p-6 shadow-2xl space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    1 Free Resume Used
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">
+                    At-cost scan pass — just enough to cover AI &amp; OCR compute
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPaywallModal(false)}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 dark:border-[#222836] bg-slate-50 dark:bg-[#181d2a] p-4 space-y-2 text-xs text-slate-700 dark:text-zinc-300">
+              <div className="flex items-center justify-between font-semibold text-slate-900 dark:text-white">
+                <span>1 Additional Resume Scan</span>
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                  ₹{quota?.unlock_price_inr ?? 29} / ${quota?.unlock_price_usd ?? 0.49}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
+                Your first resume scan is always free. Additional scans are priced strictly at cost to cover Gemini LLM inference, PDF/OCR parsing, and ATS calibration.
+              </p>
+            </div>
+
+            {unlockError && (
+              <div className="rounded-lg border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+                {unlockError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowPaywallModal(false)}
+                className="px-3.5 py-2 rounded-lg text-xs font-medium text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#1d2230] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isUnlocking}
+                onClick={handleUnlockCredit}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 disabled:opacity-50 cursor-pointer"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>
+                  {isUnlocking
+                    ? "Unlocking..."
+                    : `Unlock 1 Scan (₹${quota?.unlock_price_inr ?? 29})`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

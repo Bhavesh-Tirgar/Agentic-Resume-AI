@@ -1,12 +1,16 @@
 from collections import defaultdict
+import hashlib
+import hmac
 import os
 import logging
 from datetime import datetime, timezone
+from django.conf import settings
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
+from .models import UserResumeQuota
 from .serializers import RegisterSerializer
 from Resume.models import Resume
 from AI.Models.InterviewSessionRecord import InterviewSessionRecord
@@ -199,6 +203,71 @@ class DeleteAccountView(APIView):
                 "deleted_username": username,
                 "shredded_physical_files": erased_files_count,
                 "status": "Erased",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ResumeQuotaView(APIView):
+    """Returns the user's 1-free-resume allowance and paid at-cost credit balance."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        quota, _ = UserResumeQuota.objects.get_or_create(user=request.user)
+        return Response(quota.to_dict(), status=status.HTTP_200_OK)
+
+
+class ResumeQuotaUnlockView(APIView):
+    """
+    Unlocks minimal at-cost resume scan credits after the 1st free resume is used.
+    Verifies HMAC payment signature when PAYMENT_WEBHOOK_SECRET is configured,
+    or allows sandbox top-up only when DEBUG=True or ALLOW_SANDBOX_TOPUP=True.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        try:
+            credits = int(request.data.get("credits", 1))
+        except (TypeError, ValueError):
+            return Response({"error": "Invalid credits count."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if credits < 1 or credits > 20:
+            return Response({"error": "Credits must be between 1 and 20."}, status=status.HTTP_400_BAD_REQUEST)
+
+        webhook_secret = os.getenv("PAYMENT_WEBHOOK_SECRET", "").strip()
+        if webhook_secret:
+            payment_ref = str(request.data.get("payment_reference", "")).strip()
+            provided_sig = str(request.data.get("payment_signature", "")).strip()
+            expected_sig = hmac.new(
+                webhook_secret.encode("utf-8"),
+                f"{request.user.id}:{credits}:{payment_ref}".encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
+            if not payment_ref or not hmac.compare_digest(provided_sig, expected_sig):
+                return Response(
+                    {"error": "Invalid or missing payment verification signature."},
+                    status=status.HTTP_402_PAYMENT_REQUIRED,
+                )
+        else:
+            allow_sandbox = settings.DEBUG or os.getenv("ALLOW_SANDBOX_TOPUP", "False").lower() in ("true", "1", "yes")
+            if not allow_sandbox:
+                return Response(
+                    {"error": "Payment gateway is not configured for live top-ups."},
+                    status=status.HTTP_402_PAYMENT_REQUIRED,
+                )
+
+        quota, _ = UserResumeQuota.objects.select_for_update().get_or_create(user=request.user)
+        quota.paid_resume_credits += credits
+        quota.total_paid_inr += credits * UserResumeQuota.unlock_price_inr()
+        quota.save(update_fields=["paid_resume_credits", "total_paid_inr", "updated_at"])
+
+        return Response(
+            {
+                "message": f"Unlocked {credits} at-cost resume scan credit(s).",
+                "quota": quota.to_dict(),
             },
             status=status.HTTP_200_OK,
         )

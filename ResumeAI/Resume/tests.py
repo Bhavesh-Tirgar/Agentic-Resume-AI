@@ -85,3 +85,52 @@ class ResumeAppTests(TestCase):
 
         extracted = extract_text_from_pdf(pdf_bytes, filename="cloud_resume.pdf")
         self.assertIn("Senior Python & Distributed Systems Engineer", extracted)
+
+    def test_one_free_resume_quota_and_at_cost_unlock(self):
+        """Test 1 free resume limit, 402 paywall on 2nd upload, and at-cost credit unlock."""
+        import os
+        from unittest.mock import patch
+        import pymupdf
+
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "Alex Rivera - Backend Engineer with Python, Django, PostgreSQL, Redis, Docker.")
+        pdf_bytes = doc.tobytes()
+        doc.close()
+
+        upload_url = reverse("resume-upload")
+        quota_url = reverse("resume-quota")
+        unlock_url = reverse("resume-quota-unlock")
+
+        # 1. Initial quota: 1 free remaining, 0 paid credits
+        q_res = self.client.get(quota_url)
+        self.assertEqual(q_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(q_res.data["free_remaining"], 1)
+        self.assertEqual(q_res.data["paid_credits"], 0)
+
+        # 2. 1st resume upload is free
+        f1 = SimpleUploadedFile("first.pdf", pdf_bytes, content_type="application/pdf")
+        r1 = self.client.post(upload_url, {"resume_file": f1}, format="multipart")
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r1.data["quota"]["free_remaining"], 0)
+
+        # Deleting 1st resume must NOT reset free quota
+        self.client.delete(reverse("resume-detail", kwargs={"resume_id": r1.data["resume_id"]}))
+
+        # 3. 2nd resume upload hits 402 Payment Required
+        f2 = SimpleUploadedFile("second.pdf", pdf_bytes, content_type="application/pdf")
+        r2 = self.client.post(upload_url, {"resume_file": f2}, format="multipart")
+        self.assertEqual(r2.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+        self.assertEqual(r2.data["code"], "QUOTA_EXCEEDED")
+
+        # 4. Unlock 1 at-cost credit in sandbox mode
+        with patch.dict(os.environ, {"ALLOW_SANDBOX_TOPUP": "True"}):
+            unlock_res = self.client.post(unlock_url, {"credits": 1}, format="json")
+        self.assertEqual(unlock_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(unlock_res.data["quota"]["paid_credits"], 1)
+
+        # 5. 2nd resume upload now succeeds and consumes the paid credit
+        f3 = SimpleUploadedFile("second_unlocked.pdf", pdf_bytes, content_type="application/pdf")
+        r3 = self.client.post(upload_url, {"resume_file": f3}, format="multipart")
+        self.assertEqual(r3.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r3.data["quota"]["paid_credits"], 0)

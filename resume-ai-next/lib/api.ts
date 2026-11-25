@@ -172,12 +172,53 @@ export async function checkBackendHealth(): Promise<{ status: "connected" | "off
   }
 }
 
+export interface ResumeQuotaInfo {
+  free_limit: number;
+  free_used: number;
+  free_remaining: number;
+  paid_credits: number;
+  can_upload: boolean;
+  unlock_price_inr: number;
+  unlock_price_usd: number;
+}
+
+export class QuotaExceededError extends Error {
+  code = "QUOTA_EXCEEDED";
+  quota: ResumeQuotaInfo;
+  constructor(message: string, quota: ResumeQuotaInfo) {
+    super(message);
+    this.name = "QuotaExceededError";
+    this.quota = quota;
+  }
+}
+
+export async function getResumeQuotaApi(): Promise<ResumeQuotaInfo> {
+  const res = await fetchWithAuth("/auth/quota/", { method: "GET" });
+  if (!res.ok) {
+    throw new Error("Failed to fetch resume quota");
+  }
+  return res.json();
+}
+
+export async function unlockResumeCreditApi(credits = 1): Promise<{ message: string; quota: ResumeQuotaInfo }> {
+  const res = await fetchWithAuth("/auth/quota/unlock/", {
+    method: "POST",
+    body: JSON.stringify({ credits }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not unlock resume credit");
+  }
+  return data;
+}
+
 // 2. Resume Upload API
 export async function uploadResumeApi(file: File): Promise<{
   resume_id: number;
   message: string;
   characters: number;
   status: string;
+  quota?: ResumeQuotaInfo;
 }> {
   const formData = new FormData();
   formData.append("resume_file", file);
@@ -190,6 +231,14 @@ export async function uploadResumeApi(file: File): Promise<{
     },
     true
   );
+
+  if (res.status === 402) {
+    const err = await res.json().catch(() => ({}));
+    throw new QuotaExceededError(
+      err.message || "Your 1 free resume scan has been used.",
+      err
+    );
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
