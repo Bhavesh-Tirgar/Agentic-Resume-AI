@@ -29,6 +29,8 @@ from AI.Services.JobDiscoveryService import JobDiscoveryService
 class AITests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="aiuser", password="Password123!")
+        from Authentication.models import UserResumeQuota
+        UserResumeQuota.objects.create(user=self.user, is_pro_unlocked=True)
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
@@ -746,3 +748,33 @@ class AITests(TestCase):
             }
             res = process_resume_task(self.resume.id)
             self.assertEqual(res["resume_id"], self.resume.id)
+
+    def test_paywall_blocks_all_paid_ai_features_until_unlocked(self):
+        """Test free user can process 1 resume, but JobMatch/JobDiscovery/InterviewPlan/VirtualHR/RankedGaps return 402 until paid unlock."""
+        free_user = User.objects.create_user(username="freeonlyuser", password="Password123!")
+        free_resume = Resume.objects.create(user=free_user, status="Completed", extracted_text="Python Backend Developer")
+        free_client = APIClient()
+        free_client.force_authenticate(user=free_user)
+
+        # ResumeProcessView stays FREE for the 1 free resume
+        with patch("AI.Services.ResumeProcessService.run_resume_graph") as mock_graph:
+            mock_graph.return_value = {
+                "parsed_resume": self.mock_parsed,
+                "analysis": self.mock_analysis,
+                "score": self.mock_score,
+            }
+            proc_res = free_client.post(reverse("resume-process", kwargs={"resume_id": free_resume.id}))
+            self.assertEqual(proc_res.status_code, status.HTTP_200_OK)
+
+        # Everything else returns 402 PAYWALL_LOCKED until paid unlock
+        gated_calls = [
+            (reverse("job-matching", kwargs={"resume_id": free_resume.id}), {"job_title": "SWE", "job_description": "Python"}),
+            (reverse("job-finder", kwargs={"resume_id": free_resume.id}), {"location": "Remote"}),
+            (reverse("interview-planning", kwargs={"resume_id": free_resume.id, "job_match_id": 1}), {}),
+            (reverse("ranked-gaps", kwargs={"resume_id": free_resume.id}), {}),
+            (reverse("virtual-hr-start"), {"candidate_name": "Free User", "target_role": "Backend Engineer"}),
+        ]
+        for url, payload in gated_calls:
+            resp = free_client.post(url, payload, format="json")
+            self.assertEqual(resp.status_code, status.HTTP_402_PAYMENT_REQUIRED, f"Expected 402 for {url}")
+            self.assertEqual(resp.data["code"], "PAYWALL_LOCKED")

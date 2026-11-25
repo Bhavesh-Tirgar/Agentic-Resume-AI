@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 
 from Resume.models import Resume
+from Authentication.models import UserResumeQuota
 from AI.Models.ResumeParserResult import ResumeParserResult
 from AI.Models.ResumeAnalysisResult import ResumeAnalysisResult
 from AI.Models.ResumeScoreResult import ResumeScoreResult
@@ -19,6 +20,40 @@ from AI.Services.ResumeProcessService import ResumeProcessingService
 from AI.Services.JobMatchingService import JobMatchingService
 from AI.Services.InterviewPlanningService import InterviewPlanningService
 from AI.Services.JobDiscoveryService import JobDiscoveryService
+
+
+def require_pro_unlock(request, feature_name: str):
+    """Enforces that everything beyond the 1 free resume ATS scan requires a paid unlock."""
+    req_user = getattr(request, "user", None)
+    if not req_user or not req_user.is_authenticated:
+        return Response(
+            {
+                "code": "PAYWALL_LOCKED",
+                "message": (
+                    f"Only 1 resume ATS scan is free. Sign in and unlock Pro Pass "
+                    f"(₹{UserResumeQuota.unlock_price_inr()} / ${UserResumeQuota.unlock_price_usd():.2f}) "
+                    f"to use {feature_name}."
+                ),
+                "unlock_price_inr": UserResumeQuota.unlock_price_inr(),
+                "unlock_price_usd": UserResumeQuota.unlock_price_usd(),
+            },
+            status=status.HTTP_402_PAYMENT_REQUIRED,
+        )
+    quota, _ = UserResumeQuota.objects.get_or_create(user=req_user)
+    if not quota.is_pro_unlocked:
+        return Response(
+            {
+                "code": "PAYWALL_LOCKED",
+                "message": (
+                    f"Only 1 resume ATS scan is free. Unlock everything (Job Match, Job Scout, "
+                    f"Interview Planner & 3D Mock Interview) for ₹{UserResumeQuota.unlock_price_inr()} / "
+                    f"${UserResumeQuota.unlock_price_usd():.2f}."
+                ),
+                **quota.to_dict(),
+            },
+            status=status.HTTP_402_PAYMENT_REQUIRED,
+        )
+    return None
 
 
 def _is_session_authorized(request, session: dict) -> bool:
@@ -191,6 +226,8 @@ class JobMatchingView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
     def post(self, request, resume_id):
+        if paywall := require_pro_unlock(request, "Job Matching"):
+            return paywall
         resume = get_user_resume_or_default(request.user, resume_id)
         if not resume:
             return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -260,6 +297,8 @@ class InterviewPlanningView(APIView):
         )
 
     def post(self, request, resume_id, job_match_id):
+        if paywall := require_pro_unlock(request, "Interview Planning"):
+            return paywall
         resume = get_user_resume_or_default(request.user, resume_id)
         if not resume:
             return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -326,6 +365,8 @@ class JobDiscoveryView(APIView):
         )
 
     def post(self, request, resume_id):
+        if paywall := require_pro_unlock(request, "Job Matching"):
+            return paywall
         resume = get_user_resume_or_default(request.user, resume_id)
         if not resume:
             return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -373,6 +414,8 @@ class VirtualHRStartView(APIView):
     throttle_scope = "virtual_hr_turn"
 
     def post(self, request):
+        if paywall := require_pro_unlock(request, "Live Mock Interview"):
+            return paywall
         candidate_name = request.data.get("candidate_name")
         target_role = request.data.get("target_role", "Senior Software Engineer")
         resume_id = request.data.get("resume_id")
@@ -441,6 +484,8 @@ class VirtualHRTurnView(APIView):
     throttle_scope = "virtual_hr_turn"
 
     def post(self, request):
+        if paywall := require_pro_unlock(request, "Live Mock Interview"):
+            return paywall
         t0 = time.perf_counter()
         parsed, error_resp = _parse_and_authorize_turn_request(request)
         if error_resp is not None:
@@ -482,6 +527,8 @@ class VirtualHRTurnStreamView(APIView):
         return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
 
     def post(self, request):
+        if paywall := require_pro_unlock(request, "Live Mock Interview"):
+            return paywall
         t0 = time.perf_counter()
         parsed, error_resp = _parse_and_authorize_turn_request(request)
         if error_resp is not None:
@@ -535,6 +582,8 @@ class WhisperTranscribeView(APIView):
     throttle_scope = "whisper_stt"
 
     def post(self, request):
+        if paywall := require_pro_unlock(request, "Whisper Speech-to-Text"):
+            return paywall
         audio_file = request.FILES.get("audio")
         audio_base64 = request.data.get("audio_base64")
 
@@ -568,6 +617,8 @@ class VirtualHRFinishView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        if paywall := require_pro_unlock(request, "Live Mock Interview"):
+            return paywall
         session_id = request.data.get("session_id")
         if not session_id:
             return Response({"error": "session_id is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -634,6 +685,8 @@ class RankedGapsView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
     def post(self, request, resume_id):
+        if paywall := require_pro_unlock(request, "Job Matching"):
+            return paywall
         resume = get_user_resume_or_default(request.user, resume_id)
         if not resume:
             return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)

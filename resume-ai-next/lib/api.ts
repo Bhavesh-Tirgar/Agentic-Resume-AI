@@ -177,6 +177,7 @@ export interface ResumeQuotaInfo {
   free_used: number;
   free_remaining: number;
   paid_credits: number;
+  is_pro_unlocked: boolean;
   can_upload: boolean;
   unlock_price_inr: number;
   unlock_price_usd: number;

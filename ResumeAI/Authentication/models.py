@@ -9,6 +9,7 @@ class UserResumeQuota(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="resume_quota")
     free_resumes_used = models.PositiveIntegerField(default=0)
     paid_resume_credits = models.PositiveIntegerField(default=0)
+    is_pro_unlocked = models.BooleanField(default=False)
     total_paid_inr = models.PositiveIntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -35,6 +36,7 @@ class UserResumeQuota(models.Model):
             "free_used": self.free_resumes_used,
             "free_remaining": free_remaining,
             "paid_credits": self.paid_resume_credits,
+            "is_pro_unlocked": self.is_pro_unlocked,
             "can_upload": self.can_upload(),
             "unlock_price_inr": self.unlock_price_inr(),
             "unlock_price_usd": self.unlock_price_usd(),

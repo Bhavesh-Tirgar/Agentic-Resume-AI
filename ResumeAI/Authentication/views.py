@@ -262,8 +262,9 @@ class ResumeQuotaUnlockView(APIView):
 
         quota, _ = UserResumeQuota.objects.select_for_update().get_or_create(user=request.user)
         quota.paid_resume_credits += credits
+        quota.is_pro_unlocked = True
         quota.total_paid_inr += credits * UserResumeQuota.unlock_price_inr()
-        quota.save(update_fields=["paid_resume_credits", "total_paid_inr", "updated_at"])
+        quota.save(update_fields=["paid_resume_credits", "is_pro_unlocked", "total_paid_inr", "updated_at"])
 
         return Response(
             {
@@ -419,8 +420,9 @@ class RazorpayPaymentVerifyView(APIView):
 
         quota, _ = UserResumeQuota.objects.select_for_update().get_or_create(user=request.user)
         quota.paid_resume_credits += tx.credits
+        quota.is_pro_unlocked = True
         quota.total_paid_inr += tx.amount_inr
-        quota.save(update_fields=["paid_resume_credits", "total_paid_inr", "updated_at"])
+        quota.save(update_fields=["paid_resume_credits", "is_pro_unlocked", "total_paid_inr", "updated_at"])
 
         return Response(
             {
