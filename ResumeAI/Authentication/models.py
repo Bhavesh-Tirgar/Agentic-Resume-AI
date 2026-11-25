@@ -45,15 +45,16 @@ class UserResumeQuota(models.Model):
 
 
 class PaymentTransaction(models.Model):
-    """Idempotency ledger preventing duplicate credit minting for the same payment_id."""
+    """Server-bound order & idempotency ledger preventing credit tampering and payment replay."""
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="payment_transactions")
     provider = models.CharField(max_length=32, default="razorpay")
-    order_id = models.CharField(max_length=128)
-    payment_id = models.CharField(max_length=128, unique=True)
+    order_id = models.CharField(max_length=128, unique=True)
+    payment_id = models.CharField(max_length=128, unique=True, null=True, blank=True)
     credits = models.PositiveIntegerField(default=1)
     amount_inr = models.PositiveIntegerField(default=29)
+    status = models.CharField(max_length=16, default="pending")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
-        return f"{self.user.username} | {self.provider}:{self.payment_id} (+{self.credits})"
+        return f"{self.user.username} | {self.provider}:{self.order_id} ({self.status}, +{self.credits})"

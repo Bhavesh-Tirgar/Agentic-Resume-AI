@@ -170,7 +170,7 @@ class ResumeAppTests(TestCase):
             )
             self.assertEqual(bad_res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
-            # Valid Razorpay HMAC-SHA256 signature -> 200 and credits added
+            # Valid Razorpay HMAC-SHA256 signature -> 200 and credits EXACT server-bound 1 credit (ignores tampered client credits=20)
             valid_sig = hmac.new(secret.encode(), b"order_test_999|pay_test_777", hashlib.sha256).hexdigest()
             ok_res = self.client.post(
                 verify_url,
@@ -178,7 +178,7 @@ class ResumeAppTests(TestCase):
                     "razorpay_order_id": "order_test_999",
                     "razorpay_payment_id": "pay_test_777",
                     "razorpay_signature": valid_sig,
-                    "credits": 1,
+                    "credits": 20,
                 },
                 format="json",
             )

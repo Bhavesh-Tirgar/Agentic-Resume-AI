@@ -253,7 +253,7 @@ class ResumeQuotaUnlockView(APIView):
                     status=status.HTTP_402_PAYMENT_REQUIRED,
                 )
         else:
-            allow_sandbox = settings.DEBUG or os.getenv("ALLOW_SANDBOX_TOPUP", "False").lower() in ("true", "1", "yes")
+            allow_sandbox = os.getenv("ALLOW_SANDBOX_TOPUP", "False").lower() in ("true", "1", "yes")
             if not allow_sandbox:
                 return Response(
                     {"error": "Payment gateway is not configured for live top-ups."},
@@ -312,11 +312,20 @@ class RazorpayOrderCreateView(APIView):
                 )
                 resp.raise_for_status()
                 order_data = resp.json()
+                order_id = order_data["id"]
+                PaymentTransaction.objects.create(
+                    user=request.user,
+                    provider="razorpay",
+                    order_id=order_id,
+                    credits=credits,
+                    amount_inr=amount_inr,
+                    status="pending",
+                )
                 return Response(
                     {
                         "mode": "razorpay",
                         "key_id": key_id,
-                        "order_id": order_data["id"],
+                        "order_id": order_id,
                         "amount_paise": order_data.get("amount", amount_paise),
                         "currency": order_data.get("currency", "INR"),
                         "credits": credits,
@@ -330,7 +339,7 @@ class RazorpayOrderCreateView(APIView):
                     status=status.HTTP_502_BAD_GATEWAY,
                 )
 
-        allow_sandbox = settings.DEBUG or os.getenv("ALLOW_SANDBOX_TOPUP", "False").lower() in ("true", "1", "yes")
+        allow_sandbox = os.getenv("ALLOW_SANDBOX_TOPUP", "False").lower() in ("true", "1", "yes")
         if allow_sandbox:
             return Response(
                 {
@@ -351,7 +360,7 @@ class RazorpayOrderCreateView(APIView):
 class RazorpayPaymentVerifyView(APIView):
     """
     Verifies Razorpay Checkout HMAC-SHA256 signature (order_id|payment_id)
-    and atomically credits the user's quota with idempotent replay protection.
+    and atomically credits the server-bound order's credits with replay protection.
     """
 
     permission_classes = [IsAuthenticated]
@@ -361,12 +370,8 @@ class RazorpayPaymentVerifyView(APIView):
         order_id = str(request.data.get("razorpay_order_id", "")).strip()
         payment_id = str(request.data.get("razorpay_payment_id", "")).strip()
         signature = str(request.data.get("razorpay_signature", "")).strip()
-        try:
-            credits = int(request.data.get("credits", 1))
-        except (TypeError, ValueError):
-            return Response({"error": "Invalid credits count."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if credits < 1 or credits > 20 or not order_id or not payment_id or not signature:
+        if not order_id or not payment_id or not signature:
             return Response(
                 {"error": "Missing or invalid Razorpay payment verification fields."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -391,30 +396,35 @@ class RazorpayPaymentVerifyView(APIView):
                 status=status.HTTP_402_PAYMENT_REQUIRED,
             )
 
-        if PaymentTransaction.objects.filter(payment_id=payment_id).exists():
+        tx = (
+            PaymentTransaction.objects.select_for_update()
+            .filter(order_id=order_id, user=request.user)
+            .first()
+        )
+        if not tx:
+            return Response(
+                {"error": "Unknown payment order for this user."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if tx.status == "paid" or PaymentTransaction.objects.filter(payment_id=payment_id).exists():
             return Response(
                 {"error": "This payment has already been credited."},
                 status=status.HTTP_409_CONFLICT,
             )
 
-        amount_inr = credits * UserResumeQuota.unlock_price_inr()
-        PaymentTransaction.objects.create(
-            user=request.user,
-            provider="razorpay",
-            order_id=order_id,
-            payment_id=payment_id,
-            credits=credits,
-            amount_inr=amount_inr,
-        )
+        tx.payment_id = payment_id
+        tx.status = "paid"
+        tx.save(update_fields=["payment_id", "status"])
 
         quota, _ = UserResumeQuota.objects.select_for_update().get_or_create(user=request.user)
-        quota.paid_resume_credits += credits
-        quota.total_paid_inr += amount_inr
+        quota.paid_resume_credits += tx.credits
+        quota.total_paid_inr += tx.amount_inr
         quota.save(update_fields=["paid_resume_credits", "total_paid_inr", "updated_at"])
 
         return Response(
             {
-                "message": f"Payment verified. Unlocked {credits} resume scan credit(s).",
+                "message": f"Payment verified. Unlocked {tx.credits} resume scan credit(s).",
                 "quota": quota.to_dict(),
             },
             status=status.HTTP_200_OK,

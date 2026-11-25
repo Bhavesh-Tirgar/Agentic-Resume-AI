@@ -282,17 +282,9 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
         setStatusNotice(err.message);
         return;
       }
-      console.warn("Backend API call failed, falling back to preview simulation:", err);
-      setStatusNotice(`Processed in Local Preview: ${err.message}`);
-      setData({
-        ...INITIAL_DOSSIER,
-        score_data: {
-          ...INITIAL_DOSSIER.score_data,
-          overall_score: 93,
-          grade: "Tier-1 Exceptional",
-          percentile: "Top 3% of Technical Candidates"
-        }
-      });
+      console.error("Resume upload/processing failed:", err);
+      setStatusNotice(`Upload Error: ${err.message || "Could not process resume on backend."}`);
+      setBackendStatus("offline");
     } finally {
       setIsScanning(false);
     }
