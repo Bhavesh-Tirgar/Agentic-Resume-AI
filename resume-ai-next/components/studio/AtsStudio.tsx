@@ -33,16 +33,22 @@ function formatAtsData(processRes: any, fallbackName?: string): AtsResultData {
   const grade = overall >= 90 ? "Tier-1 Exceptional" : overall >= 80 ? "Tier-1 Competitive" : "Standard Qualified";
   const percentile = `Top ${Math.max(2, 100 - overall)}% of Verified Candidates`;
 
-  const customRewrites = (backendParsed.experience?.[0]?.description)
-    ? [
-        {
-          original: backendParsed.experience[0].description,
-          rewritten: `Engineered high-throughput production workflows across ${backendParsed.skills?.slice(0, 3).join(", ") || "core systems"}, optimizing operational latency by 42% and sustaining SLA benchmarks.`,
-          reason: "Enhances raw responsibility with concrete throughput gains, tech stack anchoring, and verified metric density."
-        },
-        ...INITIAL_DOSSIER.analysis_data.bullet_rewrites.slice(1)
-      ]
-    : INITIAL_DOSSIER.analysis_data.bullet_rewrites;
+  const rawBullets = backendScore.calibrated_bullets || backendScore.dossier?.calibrated_bullets || processRes.dossier?.calibrated_bullets;
+  const customRewrites = Array.isArray(rawBullets) && rawBullets.length > 0
+    ? rawBullets.map((b: any) => ({
+        original: b.original || "",
+        rewritten: b.calibrated || b.rewritten || "",
+        reason: `${b.impact_factor ? `${b.impact_factor} · ` : ""}${b.category || "STAR Impact Alignment"}`,
+      }))
+    : (backendParsed.experience?.[0]?.description
+        ? [
+            {
+              original: backendParsed.experience[0].description,
+              rewritten: `Spearheaded initiatives across ${(backendParsed.skills || []).slice(0, 3).join(", ") || "core competencies"}, establishing measurable SLA adherence and execution velocity.`,
+              reason: "Replaces passive task framing with active ownership and measurable outcomes.",
+            }
+          ]
+        : INITIAL_DOSSIER.analysis_data.bullet_rewrites);
 
   return {
     resume_id: processRes.resume_id || 1,
@@ -83,10 +89,8 @@ function formatAtsData(processRes: any, fallbackName?: string): AtsResultData {
         frameworks: (backendParsed.skills || []).filter((s: string) => ["Django", "Django REST Framework", "LangGraph", "FastAPI", "React", "Next.js", "LangChain", "PyTorch", "Tailwind", "CRM"].includes(s)).length
           ? (backendParsed.skills || []).filter((s: string) => ["Django", "Django REST Framework", "LangGraph", "FastAPI", "React", "Next.js", "LangChain", "PyTorch", "Tailwind", "CRM"].includes(s))
           : (backendParsed.skills || []).slice(4, 8),
-        databases: (backendParsed.skills || []).filter((s: string) => ["PostgreSQL", "Redis", "SQLite", "MongoDB", "MySQL"].includes(s)).length
-          ? (backendParsed.skills || []).filter((s: string) => ["PostgreSQL", "Redis", "SQLite", "MongoDB", "MySQL"].includes(s))
-          : ["PostgreSQL", "Redis"],
-        devops: ["Docker", "Git", "GitHub Actions", "Linux"],
+        databases: (backendParsed.skills || []).filter((s: string) => ["PostgreSQL", "Redis", "SQLite", "MongoDB", "MySQL"].includes(s)),
+        devops: (backendParsed.skills || []).filter((s: string) => ["Docker", "Kubernetes", "Git", "GitHub Actions", "Linux", "AWS", "Terraform"].includes(s)),
         all_extracted: backendParsed.skills?.length ? backendParsed.skills : undefined,
       },
       detected_languages: backendParsed.languages?.length ? backendParsed.languages : ["English", "Hindi"],
@@ -113,6 +117,7 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
   const [data, setData] = useState<AtsResultData>(INITIAL_DOSSIER);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [appliedRewriteIndex, setAppliedRewriteIndex] = useState<number | null>(null);
+  const [appliedBulletsSet, setAppliedBulletsSet] = useState<Record<number, boolean>>({});
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>("harvard");
   const [isScanning, setIsScanning] = useState(false);
   const [backendStatus, setBackendStatus] = useState<"connected" | "checking" | "offline">("checking");
@@ -148,6 +153,8 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
 
   const handleApplyRewrite = (rewrittenText: string, index: number) => {
     setAppliedRewriteIndex(index);
+    const alreadyApplied = !!appliedBulletsSet[index];
+    setAppliedBulletsSet((prev) => ({ ...prev, [index]: true }));
     setData(prev => {
       const updatedExp = [...prev.parsed_data.experience];
       if (updatedExp.length > 0) {
@@ -156,12 +163,14 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
           bullets: [rewrittenText, ...(updatedExp[0].bullets?.slice(1) || [])]
         };
       }
-      const newScore = Math.min(99, prev.score_data.overall_score + 2);
+      const nextScore = alreadyApplied
+        ? prev.score_data.overall_score
+        : Math.min(99, prev.score_data.overall_score + 2);
       return {
         ...prev,
         score_data: {
           ...prev.score_data,
-          overall_score: newScore,
+          overall_score: nextScore,
         },
         parsed_data: {
           ...prev.parsed_data,
@@ -169,7 +178,11 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
         }
       };
     });
-    setStatusNotice(`✨ Calibrated Bullet applied to candidate resume! Score upgraded to ${Math.min(99, data.score_data.overall_score + 2)}/100.`);
+    setStatusNotice(
+      alreadyApplied
+        ? "Calibrated bullet synced to local PDF export preview."
+        : "Calibrated bullet applied to your local PDF export preview (+2 estimated ATS alignment)."
+    );
     setTimeout(() => setAppliedRewriteIndex(null), 3000);
   };
 

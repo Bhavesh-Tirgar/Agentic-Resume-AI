@@ -563,3 +563,92 @@ class AITests(TestCase):
         # Oversized snapshot safely skipped without calling multimodal vision LLM
         oversized_snap = "data:image/jpeg;base64," + ("A" * (CandidateVisionService.MAX_SNAPSHOT_B64_CHARS + 50))
         self.assertIsNone(CandidateVisionService.analyze_snapshot_with_vision(oversized_snap))
+
+    def test_virtual_hr_missing_api_key_graceful_fallback(self):
+        """Test VirtualHRService initializes lazily so missing GEMINI_API_KEY triggers fallback instead of 404"""
+        import os
+        from AI.Services.VirtualHRService import VirtualHRService
+        from AI.Services.InterviewSessionManager import session_manager
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": ""}):
+            vhr = VirtualHRService()
+            sess = session_manager.create_session(candidate_name="Fallback User", target_role="Backend Engineer", user_id=self.user.id)
+            res = vhr.evaluate_turn(sess["session_id"], "I led a PostgreSQL sharding migration reducing p99 latency by 45% across 12 services.")
+            self.assertIn("evaluation", res)
+            self.assertGreater(res["evaluation"]["star_score"], 50)
+            finish_res = vhr.finish_interview(sess["session_id"])
+            self.assertIn("scorecard", finish_res)
+
+    def test_recursive_pii_restoration_and_base_agent_inheritance(self):
+        """Test recursive PII vault restoration and verify all agents inherit BaseAgent"""
+        from AI.Utils.PIIScrubber import PIIScrubber
+        from AI.Schemas.UnifiedDossierSchema import UnifiedDossierSchema, ScoreBreakdown, ExperienceItem
+        from AI.Agents.BaseAgent import BaseAgent
+        from AI.Agents.JobMatchingAgent import JobMatchingAgent
+        from AI.Agents.ResumeParserAgent import ResumeParserAgent
+        from AI.Agents.JobDiscoveryAgent import JobDiscoveryAgent
+        from AI.Agents.InterviewPlannerAgent import InterviewPlannerAgent
+
+        for cls in (JobMatchingAgent, ResumeParserAgent, JobDiscoveryAgent, InterviewPlannerAgent):
+            self.assertTrue(issubclass(cls, BaseAgent))
+
+        dossier = UnifiedDossierSchema(
+            full_name="Alex Candidate",
+            email="[REDACTED_EMAIL_1]",
+            phone="[REDACTED_PHONE_1]",
+            professional_summary="Reach me at [REDACTED_EMAIL_1].",
+            work_experience=[ExperienceItem(role="Engineer", organization="Corp", description="Escalations via [REDACTED_PHONE_1]")],
+            score=ScoreBreakdown(overall=85, content=85, format=85, keyword=85, readability=85),
+        )
+        PIIScrubber.restore_recursive(dossier, {"[REDACTED_EMAIL_1]": "alex@real.io", "[REDACTED_PHONE_1]": "+91-9876543210"})
+        self.assertEqual(dossier.email, "alex@real.io")
+        self.assertEqual(dossier.professional_summary, "Reach me at alex@real.io.")
+        self.assertIn("+91-9876543210", dossier.work_experience[0].description)
+
+    def test_job_matching_graph_enforces_max_70_hard_cap(self):
+        """Test LangGraph calibrate_match_node deterministically enforces Max-70 Hard Cap on missing must-haves"""
+        from AI.Graphs.JobMatchingGraph import calibrate_match_node
+        from AI.Schemas.JobMatchSchema import JobMatchSchema, CompetencyGap
+
+        inflated_llm_output = JobMatchSchema(
+            overall_match_score=94,
+            skill_match_score=90,
+            experience_match_score=85,
+            education_match_score=90,
+            matched_skills=["Python"],
+            missing_skills=["Kubernetes"],
+            structured_gaps=[CompetencyGap(skill="Kubernetes", type="must_have", impact="high")],
+            why_matches="Good Python.",
+            what_blocks="Missing Kubernetes.",
+        )
+        calibrated = calibrate_match_node({
+            "match_result": inflated_llm_output,
+            "vector_cosine": 0.48,
+            "vector_gaps": ["Kubernetes"],
+            "vector_matched": ["Python"],
+        })["match_result"]
+        self.assertLessEqual(calibrated.overall_match_score, 70)
+        self.assertIn("capped at 70", calibrated.what_blocks.lower())
+
+    def test_ranked_gaps_domain_aware_and_no_fake_interview_claims(self):
+        """Test non-tech resumes get domain-relevant benchmarks and 0 interviews yields zero interview claims"""
+        from AI.Services.RankedGapsService import RankedGapsService
+
+        finance_resume = Resume.objects.create(
+            user=self.user,
+            status="Completed",
+            extracted_text="Certified Public Accountant CPA with 6 years in Corporate Accounting, Statutory Audit, GAAP, and Balance Sheet Governance."
+        )
+        data = RankedGapsService.aggregate_gaps_for_resume(finance_resume)
+        top_skills = [g["skill"] for g in data["ranked_gaps"]]
+        self.assertNotIn("docker", top_skills)
+        self.assertNotIn("kafka", top_skills)
+        self.assertEqual(data["interview_synergy_count"], 0)
+        self.assertNotIn("Marcus 3D interview", data["top_unlock_headline"])
+
+    def test_http_get_no_db_mutation_and_404_on_invalid_id(self):
+        """Test HTTP GET on missing resume ID returns 404 and never mutates the database"""
+        before_count = Resume.objects.count()
+        res = self.client.get(reverse("resume-process", kwargs={"resume_id": 99999}))
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(Resume.objects.count(), before_count)

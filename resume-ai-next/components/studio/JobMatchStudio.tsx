@@ -89,18 +89,18 @@ export function JobMatchStudio({
       onMatchComplete?.(res.job_match_id);
 
       setMatchResult({
-        overall_match_score: m.overall_match_score || 91,
-        skill_match_score: m.skill_match_score || 94,
-        experience_match_score: m.experience_match_score || 88,
-        education_match_score: m.education_match_score || 95,
-        matched_skills: m.matched_skills?.length ? m.matched_skills : DEMO_JOB_MATCH_RESULT.matched_skills,
-        missing_skills: m.missing_skills?.length ? m.missing_skills : DEMO_JOB_MATCH_RESULT.missing_skills,
-        recommendations: m.recommendations?.length ? m.recommendations : DEMO_JOB_MATCH_RESULT.recommendations,
-        matched_evidence: m.matched_evidence?.length ? m.matched_evidence : (DEMO_JOB_MATCH_RESULT as any).matched_evidence,
-        adjacent_matches: m.adjacent_matches?.length ? m.adjacent_matches : (DEMO_JOB_MATCH_RESULT as any).adjacent_matches,
-        structured_gaps: m.structured_gaps?.length ? m.structured_gaps : (DEMO_JOB_MATCH_RESULT as any).structured_gaps,
-        why_matches: m.why_matches || (DEMO_JOB_MATCH_RESULT as any).why_matches,
-        what_blocks: m.what_blocks || (DEMO_JOB_MATCH_RESULT as any).what_blocks,
+        overall_match_score: m.overall_match_score ?? 0,
+        skill_match_score: m.skill_match_score ?? 0,
+        experience_match_score: m.experience_match_score ?? 0,
+        education_match_score: m.education_match_score ?? 0,
+        matched_skills: Array.isArray(m.matched_skills) ? m.matched_skills : [],
+        missing_skills: Array.isArray(m.missing_skills) ? m.missing_skills : [],
+        recommendations: Array.isArray(m.recommendations) ? m.recommendations : [],
+        matched_evidence: Array.isArray(m.matched_evidence) ? m.matched_evidence : [],
+        adjacent_matches: Array.isArray(m.adjacent_matches) ? m.adjacent_matches : [],
+        structured_gaps: Array.isArray(m.structured_gaps) ? m.structured_gaps : [],
+        why_matches: m.why_matches || "Match evaluation completed against job requirements.",
+        what_blocks: m.what_blocks || "No critical blocking competency gaps detected.",
       });
       setBackendOffline(false);
       setApiNotice(`Live API Result: Evaluated against "${jobTitle}" via Django Backend (Match ID #${res.job_match_id})`);

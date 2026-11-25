@@ -132,6 +132,7 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
       if (!ctx) return;
 
       let lastRun = 0;
+      let lastUiCommit = 0;
 
       const processVisionFrame = (timestamp: number) => {
         // Throttle processing to ~15 FPS (~66ms per frame)
@@ -280,15 +281,16 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
               };
 
               telemetryRef.current = updatedTelemetry;
-              setTelemetry(updatedTelemetry);
-
-              // Update live HUD bounding box coordinates
-              setFaceBox({
-                x: Math.max(0, (minX / w) * 100),
-                y: Math.max(0, (minY / h) * 100),
-                width: Math.min(100, ((maxX - minX) / w) * 100),
-                height: Math.min(100, ((maxY - minY) / h) * 100),
-              });
+              if (timestamp - lastUiCommit >= 250) {
+                lastUiCommit = timestamp;
+                setTelemetry(updatedTelemetry);
+                setFaceBox({
+                  x: Math.max(0, (minX / w) * 100),
+                  y: Math.max(0, (minY / h) * 100),
+                  width: Math.min(100, ((maxX - minX) / w) * 100),
+                  height: Math.min(100, ((maxY - minY) / h) * 100),
+                });
+              }
             } else {
               // No candidate face in frame
               const noFaceTelemetry: LiveVisionTelemetry = {
@@ -302,8 +304,11 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
                 head_centered: false,
               };
               telemetryRef.current = noFaceTelemetry;
-              setTelemetry(noFaceTelemetry);
-              setFaceBox(null);
+              if (timestamp - lastUiCommit >= 250) {
+                lastUiCommit = timestamp;
+                setTelemetry(noFaceTelemetry);
+                setFaceBox(null);
+              }
             }
           } catch (e) {
             // Processing error guard
@@ -404,7 +409,7 @@ export const CameraFeedHUD = forwardRef<CameraFeedHUDRef, CameraFeedHUDProps>(
             {/* Top-Left: Live Camera Status */}
             <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-mono text-white border border-white/10">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Vision Online (30 FPS)</span>
+              <span>Vision Online (15 FPS)</span>
             </div>
 
             {/* Top-Right: Measured Eye Contact Gauge & Demeanor */}

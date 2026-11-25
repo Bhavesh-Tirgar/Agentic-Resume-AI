@@ -73,3 +73,27 @@ class PIIScrubber:
         for token, original in vault.items():
             restored = restored.replace(token, original)
         return restored
+
+    @classmethod
+    def restore_recursive(cls, obj, vault: Dict[str, str]):
+        """
+        Recursively walks Pydantic models, dicts, and lists to restore any
+        [REDACTED_*] placeholders echoed anywhere in nested LLM outputs.
+        """
+        if not obj or not vault:
+            return obj
+
+        if isinstance(obj, str):
+            return cls.restore(obj, vault)
+        if isinstance(obj, list):
+            return [cls.restore_recursive(item, vault) for item in obj]
+        if isinstance(obj, dict):
+            return {k: cls.restore_recursive(v, vault) for k, v in obj.items()}
+        if hasattr(obj, "model_fields"):
+            for field_name in type(obj).model_fields:
+                current_val = getattr(obj, field_name, None)
+                updated_val = cls.restore_recursive(current_val, vault)
+                if updated_val is not current_val:
+                    setattr(obj, field_name, updated_val)
+            return obj
+        return obj

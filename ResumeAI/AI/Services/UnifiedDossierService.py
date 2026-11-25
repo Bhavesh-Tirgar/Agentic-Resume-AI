@@ -6,6 +6,7 @@ from AI.Schemas.UnifiedDossierSchema import UnifiedDossierSchema
 from AI.Prompts.UnifiedDossierPrompt import UNIFIED_DOSSIER_PROMPT
 from AI.Utils.TokenCounter import TokenCounter
 from AI.Utils.PIIScrubber import PIIScrubber
+from AI.Utils.PromptInjectionGuardrail import PromptInjectionGuardrail
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,8 @@ class UnifiedDossierService:
     """
     High-Performance Unified Dossier Synthesis Service.
     Consolidates parsing, ATS diagnostic scoring, and bullet calibration
-    into a single structured Gemini round trip (~2.5s, 81% token cut).
+    into a single structured Gemini round trip with cryptographically nonced
+    prompt injection defense and recursive PII vault restoration.
     """
 
     def __init__(self):
@@ -29,9 +31,7 @@ class UnifiedDossierService:
                     """
                     Analyze and synthesize the following candidate resume:
 
-                    <untrusted_candidate_resume>
-                    {raw_text}
-                    </untrusted_candidate_resume>
+                    {wrapped_resume}
                     """
                 ),
             ]
@@ -48,28 +48,29 @@ class UnifiedDossierService:
             raise ValueError("Resume raw text cannot be empty.")
 
         # Cap length at 12,000 characters to prevent token exhaustion and rate limits
-        sanitized_text = raw_text.strip()[:12000]
+        sanitized_len = raw_text.strip()[:12000]
 
-        # India DPDP / Privacy Guardrail: scrub sensitive contact information before LLM dispatch
-        scrubbed_text, pii_vault = PIIScrubber.redact(sanitized_text)
+        # India DPDP / Privacy Guardrail: scrub sensitive PII and enforce cryptographic nonce boundary
+        scrubbed_text, pii_vault = PIIScrubber.redact(sanitized_len)
+        wrapped_resume = PromptInjectionGuardrail.wrap_delimited_corpus(
+            scrubbed_text,
+            tag_name="untrusted_candidate_resume",
+        )
 
         start_time = time.time()
         token_counter = TokenCounter(agent_name="UnifiedDossierSynthesis")
 
         try:
             dossier: UnifiedDossierSchema = self.chain.invoke(
-                {"raw_text": scrubbed_text},
+                {"wrapped_resume": wrapped_resume},
                 config={"callbacks": [token_counter]}
             )
 
-            # Locally restore scrubbed contact info from the secure session vault
-            if dossier.email and "[REDACTED_EMAIL" in dossier.email:
-                dossier.email = PIIScrubber.restore(dossier.email, pii_vault)
-            if dossier.phone and "[REDACTED_PHONE" in dossier.phone:
-                dossier.phone = PIIScrubber.restore(dossier.phone, pii_vault)
+            # Recursively restore any redacted PII tokens echoed anywhere inside nested dossier fields
+            PIIScrubber.restore_recursive(dossier, pii_vault)
 
             elapsed_time = round(time.time() - start_time, 2)
-            logger.info("Unified dossier synthesized in %ss (PII vault protected)", elapsed_time)
+            logger.info("Unified dossier synthesized in %ss (PII vault & nonce guardrail protected)", elapsed_time)
 
             return {
                 "dossier": dossier,

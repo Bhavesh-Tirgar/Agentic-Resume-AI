@@ -48,10 +48,18 @@ class VirtualHRService:
     SHRUG_PHRASES = ["don't know", "dont know", "no idea", "dunno", "not sure"]
 
     def __init__(self):
-        self.gemini_service = GeminiService()
-        self.llm = self.gemini_service.get_llm()
-        self.turn_evaluator = self.llm.with_structured_output(InterviewTurnEvaluation)
-        self.scorecard_compiler = self.llm.with_structured_output(InterviewFinalScorecard)
+        self.gemini_service = None
+        self.llm = None
+        self.turn_evaluator = None
+        self.scorecard_compiler = None
+
+    def _ensure_llm(self):
+        """Lazily binds Gemini LLM clients inside protected fallback blocks so missing API keys trigger graceful fallbacks."""
+        if self.turn_evaluator is None or self.scorecard_compiler is None:
+            self.gemini_service = GeminiService()
+            self.llm = self.gemini_service.get_llm()
+            self.turn_evaluator = self.llm.with_structured_output(InterviewTurnEvaluation)
+            self.scorecard_compiler = self.llm.with_structured_output(InterviewFinalScorecard)
 
     @classmethod
     def _has_profanity(cls, text: str) -> bool:
@@ -242,6 +250,7 @@ class VirtualHRService:
         )
 
         try:
+            self._ensure_llm()
             eval_result: InterviewTurnEvaluation = self.turn_evaluator.invoke(prompt_text)
             eval_result.vision = vision_metrics
         except Exception as exc:
@@ -344,6 +353,7 @@ class VirtualHRService:
         )
 
         try:
+            self._ensure_llm()
             scorecard: InterviewFinalScorecard = self.scorecard_compiler.invoke(prompt_text)
             scorecard_data = scorecard.model_dump()
         except Exception as exc:

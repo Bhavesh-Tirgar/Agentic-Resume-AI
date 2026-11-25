@@ -224,15 +224,15 @@ class JobMatchingService:
                 parser_result = process_res["parser_result"]
                 resume_schema = ResumeSchema.model_validate(parser_result.parsed_data)
 
-        clean_title = PromptInjectionGuardrail.sanitize_untrusted_text(job_title.strip())
-        clean_desc = PromptInjectionGuardrail.sanitize_untrusted_text(job_description.strip() if job_description else "")
+        raw_title = job_title.strip()
+        raw_desc = job_description.strip() if job_description else ""
 
-        # Run multi-node LangGraph execution with ReAct reflection
+        # Run multi-node LangGraph execution (vector similarity runs on clean text; agent wraps prompts cleanly)
         try:
             result = run_job_matching_graph(
                 resume=resume_schema,
-                job_title=clean_title,
-                job_description=clean_desc,
+                job_title=raw_title,
+                job_description=raw_desc,
                 thread_id=f"job_match_{resume.id}"
             )
             match_result = result.get("match_result")
@@ -241,12 +241,12 @@ class JobMatchingService:
             match_result = None
 
         if match_result is None:
-            match_result = build_heuristic_job_match(resume_schema, clean_title, clean_desc)
+            match_result = build_heuristic_job_match(resume_schema, raw_title, raw_desc)
 
         saved_result = JobMatchResult.objects.create(
             resume=resume,
-            job_title=clean_title,
-            job_description=clean_desc,
+            job_title=raw_title[:255],
+            job_description=raw_desc[:12000],
             match_data=match_result.model_dump(),
         )
 

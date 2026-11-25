@@ -1,6 +1,7 @@
 import logging
 import re
 from typing import Any, Dict, List, Optional, Set
+from django.db.models import Q
 from Resume.models import Resume
 from AI.Models.JobDiscoveryResult import JobDiscoveryResult
 from AI.Models.JobMatchResult import JobMatchResult
@@ -178,47 +179,46 @@ class RankedGapsService:
         except Exception as e:
             logger.debug("Could not read match results: %s", e)
 
-        # Fallback to realistic benchmark pipeline if jobs pool is sparse
-        if len(jobs_pool) < 3:
-            jobs_pool.extend([
-                {
-                    "title": "Senior Backend Engineer",
-                    "company": "Scalable Cloud Corp",
-                    "missing_skills": ["Docker", "Kubernetes", "Redis", "Kafka"],
-                    "must_haves": ["Docker", "Redis"],
-                },
-                {
-                    "title": "Full Stack Platform Specialist",
-                    "company": "Enterprise Fintech Labs",
-                    "missing_skills": ["Docker", "AWS", "CI/CD", "PostgreSQL"],
-                    "must_haves": ["Docker", "AWS"],
-                },
-                {
-                    "title": "Cloud Solutions Developer",
-                    "company": "Apex Modern Software",
-                    "missing_skills": ["Docker", "Redis", "System Design", "AWS"],
-                    "must_haves": ["Redis", "Docker"],
-                },
-                {
-                    "title": "Systems Infrastructure Specialist",
-                    "company": "Global Data Platforms",
-                    "missing_skills": ["Kubernetes", "Docker", "CI/CD", "PostgreSQL"],
-                    "must_haves": ["Docker", "Kubernetes"],
-                },
-            ])
+        # Supplement ONLY when zero jobs exist using domain-authentic benchmarks (never push Docker onto Sales/Finance!)
+        if len(jobs_pool) == 0:
+            raw_domain_blob = (getattr(resume, "extracted_text", "") or "").lower()
+            if any(k in raw_domain_blob for k in ["sales", "account executive", "b2b", "crm", "revenue"]):
+                jobs_pool.extend([
+                    {"title": "Senior Enterprise Account Executive", "company": "Cloud CRM Leader", "missing_skills": ["MEDDPICC", "Salesforce CRM Analytics", "Executive Negotiation"], "must_haves": ["MEDDPICC"]},
+                    {"title": "Strategic Alliances Director", "company": "Enterprise SaaS", "missing_skills": ["Revenue Forecasting", "Territory Mapping", "MEDDPICC"], "must_haves": ["Revenue Forecasting"]},
+                ])
+            elif any(k in raw_domain_blob for k in ["accounting", "finance", "audit", "cpa", "gaap", "tax", "ledger"]):
+                jobs_pool.extend([
+                    {"title": "Senior Financial Controller", "company": "Advisory Partners", "missing_skills": ["ERP Financials", "ASC 606 Revenue Recognition", "Financial Modeling"], "must_haves": ["ERP Financials"]},
+                    {"title": "FP&A Manager", "company": "Global FinOps", "missing_skills": ["Anaplan", "Variance Analysis", "ERP Financials"], "must_haves": ["Variance Analysis"]},
+                ])
+            elif any(k in raw_domain_blob for k in ["marketing", "seo", "brand", "campaign", "growth"]):
+                jobs_pool.extend([
+                    {"title": "Growth Marketing Lead", "company": "ScaleUp Media", "missing_skills": ["Attribution Modeling", "Lifecycle CRM", "SQL Analytics"], "must_haves": ["Attribution Modeling"]},
+                ])
+            elif any(k in raw_domain_blob for k in ["operations", "supply chain", "logistics", "procurement"]):
+                jobs_pool.extend([
+                    {"title": "Senior Operations Manager", "company": "Global Logistics", "missing_skills": ["Six Sigma", "WMS/TMS Integration", "Vendor SLA Governance"], "must_haves": ["Six Sigma"]},
+                ])
+            else:
+                jobs_pool.extend([
+                    {"title": "Senior Backend Engineer", "company": "Scalable Cloud Corp", "missing_skills": ["Docker", "Kubernetes", "Redis", "Kafka"], "must_haves": ["Docker", "Redis"]},
+                    {"title": "Full Stack Platform Specialist", "company": "Enterprise Fintech Labs", "missing_skills": ["Docker", "AWS", "CI/CD", "PostgreSQL"], "must_haves": ["Docker", "AWS"]},
+                ])
 
         total_jobs_evaluated = len(jobs_pool)
 
-        # 3. Gather interview feedback & weak topics for this candidate
+        # 3. Gather real interview feedback & weak topics ONLY when sessions exist (zero hallucinated feedback)
         interview_weaknesses: List[str] = []
         try:
             from AI.Models.InterviewSessionRecord import InterviewSessionRecord
             user_id = getattr(resume.user, "id", None) if resume.user else None
-            records = InterviewSessionRecord.objects.filter(
-                resume_id=resume.id
-            ) | (InterviewSessionRecord.objects.filter(user_id=user_id) if user_id else InterviewSessionRecord.objects.none())
+            query_filter = Q(resume_id=resume.id)
+            if user_id:
+                query_filter |= Q(user_id=user_id)
+            records = InterviewSessionRecord.objects.filter(query_filter).distinct().order_by("-created_at")[:3]
 
-            for rec in records.order_by("-created_at")[:3]:
+            for rec in records:
                 scorecard = rec.scorecard_data or {}
                 if isinstance(scorecard, dict):
                     interview_weaknesses.extend(scorecard.get("critical_gaps", []))
@@ -228,13 +228,6 @@ class RankedGapsService:
                             interview_weaknesses.append(day["focus"])
         except Exception as e:
             logger.debug("Interview history lookup deferred: %s", e)
-
-        # Fallback benchmark interview weaknesses if candidate hasn't taken interview yet
-        if not interview_weaknesses:
-            interview_weaknesses = [
-                "Candidate struggled to articulate container isolation and multi-stage builds under questioning.",
-                "Needs deeper familiarity with caching strategies and cache invalidation patterns.",
-            ]
 
         # 4. Tally missing skills across all jobs
         skill_counts: Dict[str, int] = {}

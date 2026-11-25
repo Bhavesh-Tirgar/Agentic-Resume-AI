@@ -29,23 +29,38 @@ def _is_session_authorized(request, session: dict) -> bool:
     return bool(req_user and req_user.is_authenticated and req_user.id == owner_id)
 
 
-def get_user_resume_or_default(user, resume_id: int) -> Resume:
+def resolve_resume_for_read(user, resume_id: int):
     """
-    Safely retrieves a user's resume by ID.
-    If the requested ID does not belong to the user, falls back to the user's
-    latest uploaded resume. If the user has zero resumes, automatically creates
-    a baseline engineering resume for them so they can test immediately.
+    Pure read lookup without side-effect DB mutations on HTTP GET.
+    Matches user's exact resume_id, or falls back to their latest resume when default id<=1 is queried.
     """
     resume = Resume.objects.filter(id=resume_id, user=user).first()
     if resume:
         return resume
+    if resume_id <= 1:
+        return Resume.objects.filter(user=user).order_by("-id").first()
+    return None
+
+
+def get_user_resume_or_default(user, resume_id: int):
+    """
+    Retrieves a user's resume for mutation/action endpoints (POST).
+    Rejects mismatched explicit IDs (>1) with None -> 404, while seamlessly provisioning
+    an onboarding baseline only when default ID<=1 is triggered by a brand-new user.
+    """
+    resume = Resume.objects.filter(id=resume_id, user=user).first()
+    if resume:
+        return resume
+
+    if resume_id > 1:
+        return None
 
     # Fallback to user's latest resume
     resume = Resume.objects.filter(user=user).order_by("-id").first()
     if resume:
         return resume
 
-    # Fallback: create baseline resume for seamless first-time onboarding
+    # First-time onboarding baseline on explicit action (POST) when user has 0 resumes
     baseline_text = """ALEX MORGAN
 Email: alex.morgan@example.com | Phone: +1 (555) 019-2834 | San Francisco, CA
 Senior Solutions & Systems Specialist
@@ -82,7 +97,9 @@ class ResumeProcessView(APIView):
     throttle_scope = "ai_heavy"
 
     def get(self, request, resume_id):
-        resume = get_user_resume_or_default(request.user, resume_id)
+        resume = resolve_resume_for_read(request.user, resume_id)
+        if not resume:
+            return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             parser = resume.parser_result
@@ -116,6 +133,8 @@ class ResumeProcessView(APIView):
 
     def post(self, request, resume_id):
         resume = get_user_resume_or_default(request.user, resume_id)
+        if not resume:
+            return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             result = ResumeProcessingService.process(resume)
@@ -154,7 +173,9 @@ class JobMatchingView(APIView):
     throttle_scope = "ai_heavy"
 
     def get(self, request, resume_id):
-        resume = get_user_resume_or_default(request.user, resume_id)
+        resume = resolve_resume_for_read(request.user, resume_id)
+        if not resume:
+            return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
         matches = JobMatchResult.objects.filter(resume=resume).order_by("-created_at")
         data = [
             {
@@ -170,6 +191,8 @@ class JobMatchingView(APIView):
 
     def post(self, request, resume_id):
         resume = get_user_resume_or_default(request.user, resume_id)
+        if not resume:
+            return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
         job_description = request.data.get("job_description", "")
         job_title = request.data.get("job_title", "")
 
@@ -210,12 +233,20 @@ class InterviewPlanningView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, resume_id, job_match_id):
-        resume = get_user_resume_or_default(request.user, resume_id)
-        plan = InterviewPlanResult.objects.filter(resume=resume).first()
+        resume = resolve_resume_for_read(request.user, resume_id)
+        if not resume:
+            return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        plan = InterviewPlanResult.objects.filter(resume=resume, job_match_id=job_match_id).first()
+        if not plan and job_match_id <= 1:
+            plan = InterviewPlanResult.objects.filter(resume=resume).first()
         if not plan:
-            try:
-                plan = InterviewPlanningService.create_plan(resume=resume, job_match_id=job_match_id)
-            except Exception:
+            if JobMatchResult.objects.filter(id=job_match_id, resume=resume).exists():
+                try:
+                    plan = InterviewPlanningService.create_plan(resume=resume, job_match_id=job_match_id)
+                except Exception:
+                    return Response({"error": "Interview plan not found."}, status=status.HTTP_404_NOT_FOUND)
+            else:
                 return Response({"error": "Interview plan not found."}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(
@@ -229,6 +260,8 @@ class InterviewPlanningView(APIView):
 
     def post(self, request, resume_id, job_match_id):
         resume = get_user_resume_or_default(request.user, resume_id)
+        if not resume:
+            return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
 
         match = JobMatchResult.objects.filter(id=job_match_id, resume=resume).first()
         if not match:
@@ -272,22 +305,13 @@ class JobDiscoveryView(APIView):
     throttle_scope = "ai_heavy"
 
     def get(self, request, resume_id):
-        resume = get_user_resume_or_default(request.user, resume_id)
+        resume = resolve_resume_for_read(request.user, resume_id)
+        if not resume:
+            return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
         latest = JobDiscoveryResult.objects.filter(resume=resume).first()
 
         if not latest:
-            try:
-                latest = JobDiscoveryService.discover_jobs(
-                    resume=resume,
-                    location="Remote / Nationwide",
-                    work_type="All",
-                    radius_km=25
-                )
-            except Exception as exc:
-                return Response(
-                    {"error": f"Failed to discover jobs: {exc}"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+            return Response({"error": "No discovered jobs found yet for this resume."}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(
             {
@@ -302,6 +326,8 @@ class JobDiscoveryView(APIView):
 
     def post(self, request, resume_id):
         resume = get_user_resume_or_default(request.user, resume_id)
+        if not resume:
+            return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
         location = request.data.get("location", "Remote / Nationwide")
         work_type = request.data.get("work_type", "All")
         raw_radius = request.data.get("radius_km") or request.data.get("radius", 25)
@@ -421,7 +447,10 @@ class VirtualHRTurnView(APIView):
             return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except ValueError as exc:
             err_msg = str(exc)
-            code = status.HTTP_400_BAD_REQUEST if "exceeds" in err_msg.lower() else status.HTTP_404_NOT_FOUND
+            if "not found" in err_msg.lower():
+                code = status.HTTP_404_NOT_FOUND
+            else:
+                code = status.HTTP_400_BAD_REQUEST
             return Response({"error": err_msg}, status=code)
         except Exception as exc:
             return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -524,13 +553,17 @@ class RankedGapsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, resume_id):
-        resume = get_user_resume_or_default(request.user, resume_id)
+        resume = resolve_resume_for_read(request.user, resume_id)
+        if not resume:
+            return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
         from AI.Services.RankedGapsService import RankedGapsService
         data = RankedGapsService.aggregate_gaps_for_resume(resume)
         return Response(data, status=status.HTTP_200_OK)
 
     def post(self, request, resume_id):
         resume = get_user_resume_or_default(request.user, resume_id)
+        if not resume:
+            return Response({"error": "Resume not found."}, status=status.HTTP_404_NOT_FOUND)
         candidate_jobs = request.data.get("jobs", None)
         from AI.Services.RankedGapsService import RankedGapsService
         data = RankedGapsService.aggregate_gaps_for_resume(resume, candidate_jobs=candidate_jobs)

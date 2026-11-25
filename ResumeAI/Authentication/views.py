@@ -1,3 +1,4 @@
+from collections import defaultdict
 import os
 import logging
 from datetime import datetime, timezone
@@ -55,57 +56,44 @@ class DataExportView(APIView):
 
     def get(self, request):
         user = request.user
+        resumes_qs = list(
+            Resume.objects.filter(user=user)
+            .select_related("parser_result", "analysis_result", "score_result")
+            .order_by("-uploaded_at")
+        )
+        resume_ids = [r.id for r in resumes_qs]
+
+        # Bulk fetch related dossiers in O(1) queries to eliminate 6N+1 N+1 waterfall
+        matches_by_resume = defaultdict(list)
+        for m in JobMatchResult.objects.filter(resume_id__in=resume_ids):
+            matches_by_resume[m.resume_id].append({
+                "job_title": m.job_title,
+                "job_description": m.job_description,
+                "match_data": m.match_data,
+                "created_at": m.created_at.isoformat(),
+            })
+
+        plans_by_resume = defaultdict(list)
+        for p in InterviewPlanResult.objects.filter(resume_id__in=resume_ids):
+            plans_by_resume[p.resume_id].append({
+                "plan_data": p.plan_data,
+                "created_at": p.created_at.isoformat(),
+            })
+
+        discoveries_by_resume = defaultdict(list)
+        for d in JobDiscoveryResult.objects.filter(resume_id__in=resume_ids):
+            discoveries_by_resume[d.resume_id].append({
+                "location_query": d.location_query,
+                "work_type": d.work_type,
+                "discovery_data": d.discovery_data,
+                "created_at": d.created_at.isoformat(),
+            })
+
         resumes_data = []
-
-        for resume in Resume.objects.filter(user=user):
-            parser_data = None
-            try:
-                if hasattr(resume, "parser_result"):
-                    parser_data = resume.parser_result.parsed_data
-            except Exception:
-                pass
-
-            analysis_data = None
-            try:
-                if hasattr(resume, "analysis_result"):
-                    analysis_data = resume.analysis_result.analysis_data
-            except Exception:
-                pass
-
-            score_data = None
-            try:
-                if hasattr(resume, "score_result"):
-                    score_data = resume.score_result.score_data
-            except Exception:
-                pass
-
-            matches = [
-                {
-                    "job_title": m.job_title,
-                    "job_description": m.job_description,
-                    "match_data": m.match_data,
-                    "created_at": m.created_at.isoformat(),
-                }
-                for m in JobMatchResult.objects.filter(resume=resume)
-            ]
-
-            plans = [
-                {
-                    "plan_data": p.plan_data,
-                    "created_at": p.created_at.isoformat(),
-                }
-                for p in InterviewPlanResult.objects.filter(resume=resume)
-            ]
-
-            discoveries = [
-                {
-                    "location_query": d.location_query,
-                    "work_type": d.work_type,
-                    "discovery_data": d.discovery_data,
-                    "created_at": d.created_at.isoformat(),
-                }
-                for d in JobDiscoveryResult.objects.filter(resume=resume)
-            ]
+        for resume in resumes_qs:
+            parser_data = getattr(getattr(resume, "parser_result", None), "parsed_data", None)
+            analysis_data = getattr(getattr(resume, "analysis_result", None), "analysis_data", None)
+            score_data = getattr(getattr(resume, "score_result", None), "score_data", None)
 
             resumes_data.append({
                 "resume_id": resume.id,
@@ -116,9 +104,9 @@ class DataExportView(APIView):
                 "parser_result": parser_data,
                 "analysis_result": analysis_data,
                 "score_result": score_data,
-                "job_matches": matches,
-                "interview_plans": plans,
-                "job_discoveries": discoveries,
+                "job_matches": matches_by_resume[resume.id],
+                "interview_plans": plans_by_resume[resume.id],
+                "job_discoveries": discoveries_by_resume[resume.id],
             })
 
         interview_sessions = [

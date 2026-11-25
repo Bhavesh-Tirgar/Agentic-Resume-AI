@@ -92,3 +92,14 @@ class AuthenticationTests(TestCase):
         self.assertEqual(success_res.data["status"], "Erased")
         self.assertFalse(User.objects.filter(username="bhavesh").exists())
         self.assertEqual(Resume.objects.filter(user_id=user.id).count(), 0)
+
+    def test_data_export_constant_queries_no_n_plus_one(self):
+        """Test DPDP export stays constant-query regardless of resume count (no 6N+1 N+1 storm)"""
+        user = User.objects.create_user(**self.user_data)
+        for i in range(6):
+            Resume.objects.create(user=user, status="Completed", extracted_text=f"Resume #{i}")
+        self.client.force_authenticate(user=user)
+        with self.assertNumQueries(5):
+            res = self.client.get(self.export_url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data["resumes"]), 6)

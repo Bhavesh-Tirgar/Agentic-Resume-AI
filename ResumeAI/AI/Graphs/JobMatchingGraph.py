@@ -68,16 +68,42 @@ def match_job_node(state: JobMatchingState) -> dict:
 
 def calibrate_match_node(state: JobMatchingState) -> dict:
     """
-    Reconciliation Node: Anchors the LLM's qualitative assessment to the empirical
-    cosine vector similarity, eliminating hallucinated scores and missing skills.
+    Reconciliation Node: Anchors the LLM's qualitative assessment to empirical
+    cosine similarity and enforces the CareerPilot Max-70 Hard Cap deterministically.
     """
     result = state["match_result"]
-    cosine_sim = state.get("vector_cosine", 0.5)
+    cosine_sim = float(state.get("vector_cosine", 0.5))
     vector_gaps = state.get("vector_gaps", [])
+    vector_matched = state.get("vector_matched", [])
 
-    # If LLM failed to identify missing skills, backfill with verified vector gaps
+    # Backfill missing skills if LLM omitted obvious vector gaps
     if not result.missing_skills and vector_gaps:
         result.missing_skills = vector_gaps[:5]
+
+    # Check empirical missing must-haves or severe vector mismatch
+    has_missing_must_have = any(
+        getattr(g, "type", None) == "must_have"
+        for g in (result.structured_gaps or [])
+    )
+    if not result.structured_gaps and len(result.missing_skills or []) > 0 and cosine_sim < 0.72:
+        has_missing_must_have = True
+
+    # Enforce CareerPilot Hard Cap Rule: max 70 when critical must-have gaps block qualification
+    if has_missing_must_have and result.overall_match_score > 70:
+        result.overall_match_score = 70
+        cap_note = "Capped at 70 per CareerPilot Hard Cap Rule due to missing must-have requirements."
+        if cap_note not in (result.gaps or []):
+            result.gaps = [cap_note] + list(result.gaps or [])
+        if not result.what_blocks or "capped at 70" not in result.what_blocks.lower():
+            blocking_skill = next(
+                (g.skill for g in (result.structured_gaps or []) if g.type == "must_have"),
+                (result.missing_skills[0] if result.missing_skills else "core must-have skill"),
+            )
+            result.what_blocks = f"Capped at 70: missing must-have competency '{blocking_skill}' blocks full qualification."
+
+    # Anchor runaway high scores when empirical TF-IDF vector overlap is near zero
+    if cosine_sim < 0.12 and not vector_matched and result.overall_match_score > 65:
+        result.overall_match_score = min(result.overall_match_score, int(round(45 + cosine_sim * 100)))
 
     return {"match_result": result}
 
