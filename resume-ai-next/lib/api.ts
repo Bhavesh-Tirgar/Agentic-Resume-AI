@@ -212,6 +212,42 @@ export async function unlockResumeCreditApi(credits = 1): Promise<{ message: str
   return data;
 }
 
+export async function createRazorpayOrderApi(credits = 1): Promise<{
+  mode: "razorpay" | "sandbox";
+  key_id?: string;
+  order_id?: string;
+  amount_paise: number;
+  currency: string;
+  credits: number;
+}> {
+  const res = await fetchWithAuth("/auth/quota/order/", {
+    method: "POST",
+    body: JSON.stringify({ credits }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not create payment order");
+  }
+  return data;
+}
+
+export async function verifyRazorpayPaymentApi(payload: {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  credits?: number;
+}): Promise<{ message: string; quota: ResumeQuotaInfo }> {
+  const res = await fetchWithAuth("/auth/quota/verify/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Payment verification failed");
+  }
+  return data;
+}
+
 // 2. Resume Upload API
 export async function uploadResumeApi(file: File): Promise<{
   resume_id: number;

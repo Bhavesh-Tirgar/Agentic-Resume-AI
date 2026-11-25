@@ -7,7 +7,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-14.2-black.svg?logo=next.js&logoColor=white)](https://nextjs.org)
 [![LangGraph](https://img.shields.io/badge/LangGraph-3%20State%20Graphs-FF6F00.svg?logo=langchain&logoColor=white)](https://langchain-ai.github.io/langgraph/)
 [![Google Gemini](https://img.shields.io/badge/Gemini-2.5%20Flash-4285F4.svg?logo=google&logoColor=white)](https://ai.google.dev)
-[![Tests](https://img.shields.io/badge/Django%20Tests-39%2F39%20Passing-emerald.svg)](#-verification--quality-gates)
+[![Tests](https://img.shields.io/badge/Django%20Tests-40%2F40%20Passing-emerald.svg)](#-verification--quality-gates)
 
 **An enterprise-grade, multi-agent AI career platform for ATS resume auditing, deterministic job matching, skill-gap roadmapping, and real-time voice + vision mock interviews.**
 
@@ -103,7 +103,7 @@ CareerPilot uses **6 specialized LLM Agents** (all inheriting [`BaseAgent`](file
 - **1-Free-Resume Quota Gate (`UserResumeQuota`)**:
   - 1st completed resume scan is **free** (persisted per user so deleting the 1st resume does not reset free quota).
   - Subsequent uploads return **`HTTP 402 Payment Required`** (`QUOTA_EXCEEDED`) before running PDF/OCR extraction.
-  - `/api/auth/quota/unlock/` supports HMAC-SHA256 payment signature verification (`PAYMENT_WEBHOOK_SECRET`) or sandbox top-up in dev (`DEBUG=True` / `ALLOW_SANDBOX_TOPUP=True`). *(Note: live Razorpay/Stripe checkout UI is not wired yet; only the backend HMAC verification hook and dev sandbox unlock are active.)*
+  - `/api/auth/quota/order/` & `/api/auth/quota/verify/` integrate **Razorpay Checkout** (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`) with HMAC-SHA256 signature verification, `PaymentTransaction` replay protection (`409 Conflict`), and local dev sandbox fallback (`DEBUG=True` / `ALLOW_SANDBOX_TOPUP=True`).
 
 ---
 
@@ -150,7 +150,7 @@ docker compose --profile fullstack up --build
 | Gate | Command | Status |
 |---|---|---|
 | Django System Check | `python manage.py check` | `0 issues` |
-| Django Unit & API Suite | `python manage.py test` | `39/39 OK` |
+| Django Unit & API Suite | `python manage.py test` | `40/40 OK` |
 | Golden LLM Security & Rubric Eval | `python manage.py run_llm_eval` | `5/5 PASS` |
 | Next.js Production Build | `npm run build` | `Exit 0 (9 static routes)` |
 | Headless Chrome CDP E2E | `node e2e/smoke.mjs` | `4/4 routes` |

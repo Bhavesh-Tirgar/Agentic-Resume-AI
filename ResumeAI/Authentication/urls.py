@@ -6,6 +6,8 @@ from .views import (
     DeleteAccountView,
     ResumeQuotaView,
     ResumeQuotaUnlockView,
+    RazorpayOrderCreateView,
+    RazorpayPaymentVerifyView,
 )
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -20,6 +22,8 @@ urlpatterns = [
     path("profile/", ProfileView.as_view(), name="profile"),
     path("quota/", ResumeQuotaView.as_view(), name="resume-quota"),
     path("quota/unlock/", ResumeQuotaUnlockView.as_view(), name="resume-quota-unlock"),
+    path("quota/order/", RazorpayOrderCreateView.as_view(), name="resume-quota-order"),
+    path("quota/verify/", RazorpayPaymentVerifyView.as_view(), name="resume-quota-verify"),
 
     # India DPDP Act (2023) & EU GDPR Privacy Endpoints
     path("privacy/export-data/", DataExportView.as_view(), name="privacy-export-data"),

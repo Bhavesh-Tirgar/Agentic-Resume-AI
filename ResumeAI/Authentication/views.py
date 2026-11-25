@@ -10,7 +10,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
-from .models import UserResumeQuota
+import requests
+from .models import UserResumeQuota, PaymentTransaction
 from .serializers import RegisterSerializer
 from Resume.models import Resume
 from AI.Models.InterviewSessionRecord import InterviewSessionRecord
@@ -267,6 +268,153 @@ class ResumeQuotaUnlockView(APIView):
         return Response(
             {
                 "message": f"Unlocked {credits} at-cost resume scan credit(s).",
+                "quota": quota.to_dict(),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class RazorpayOrderCreateView(APIView):
+    """
+    Creates a Razorpay order for at-cost resume scan credits when RAZORPAY_KEY_ID
+    and RAZORPAY_KEY_SECRET are configured, or signals sandbox mode in local dev.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            credits = int(request.data.get("credits", 1))
+        except (TypeError, ValueError):
+            return Response({"error": "Invalid credits count."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if credits < 1 or credits > 20:
+            return Response({"error": "Credits must be between 1 and 20."}, status=status.HTTP_400_BAD_REQUEST)
+
+        amount_inr = credits * UserResumeQuota.unlock_price_inr()
+        amount_paise = amount_inr * 100
+
+        key_id = os.getenv("RAZORPAY_KEY_ID", "").strip()
+        key_secret = os.getenv("RAZORPAY_KEY_SECRET", "").strip()
+
+        if key_id and key_secret:
+            try:
+                resp = requests.post(
+                    "https://api.razorpay.com/v1/orders",
+                    auth=(key_id, key_secret),
+                    json={
+                        "amount": amount_paise,
+                        "currency": "INR",
+                        "receipt": f"cp_u{request.user.id}_c{credits}",
+                        "notes": {"user_id": str(request.user.id), "credits": str(credits)},
+                    },
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                order_data = resp.json()
+                return Response(
+                    {
+                        "mode": "razorpay",
+                        "key_id": key_id,
+                        "order_id": order_data["id"],
+                        "amount_paise": order_data.get("amount", amount_paise),
+                        "currency": order_data.get("currency", "INR"),
+                        "credits": credits,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            except Exception as exc:
+                logger.exception("Razorpay order creation failed: %s", exc)
+                return Response(
+                    {"error": "Payment gateway temporarily unavailable."},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+        allow_sandbox = settings.DEBUG or os.getenv("ALLOW_SANDBOX_TOPUP", "False").lower() in ("true", "1", "yes")
+        if allow_sandbox:
+            return Response(
+                {
+                    "mode": "sandbox",
+                    "credits": credits,
+                    "amount_paise": amount_paise,
+                    "currency": "INR",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {"error": "Payment gateway is not configured."},
+            status=status.HTTP_402_PAYMENT_REQUIRED,
+        )
+
+
+class RazorpayPaymentVerifyView(APIView):
+    """
+    Verifies Razorpay Checkout HMAC-SHA256 signature (order_id|payment_id)
+    and atomically credits the user's quota with idempotent replay protection.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        order_id = str(request.data.get("razorpay_order_id", "")).strip()
+        payment_id = str(request.data.get("razorpay_payment_id", "")).strip()
+        signature = str(request.data.get("razorpay_signature", "")).strip()
+        try:
+            credits = int(request.data.get("credits", 1))
+        except (TypeError, ValueError):
+            return Response({"error": "Invalid credits count."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if credits < 1 or credits > 20 or not order_id or not payment_id or not signature:
+            return Response(
+                {"error": "Missing or invalid Razorpay payment verification fields."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        key_secret = os.getenv("RAZORPAY_KEY_SECRET", "").strip()
+        if not key_secret:
+            return Response(
+                {"error": "Razorpay secret is not configured on server."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        expected_sig = hmac.new(
+            key_secret.encode("utf-8"),
+            f"{order_id}|{payment_id}".encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not hmac.compare_digest(signature, expected_sig):
+            return Response(
+                {"error": "Invalid Razorpay payment signature."},
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
+        if PaymentTransaction.objects.filter(payment_id=payment_id).exists():
+            return Response(
+                {"error": "This payment has already been credited."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        amount_inr = credits * UserResumeQuota.unlock_price_inr()
+        PaymentTransaction.objects.create(
+            user=request.user,
+            provider="razorpay",
+            order_id=order_id,
+            payment_id=payment_id,
+            credits=credits,
+            amount_inr=amount_inr,
+        )
+
+        quota, _ = UserResumeQuota.objects.select_for_update().get_or_create(user=request.user)
+        quota.paid_resume_credits += credits
+        quota.total_paid_inr += amount_inr
+        quota.save(update_fields=["paid_resume_credits", "total_paid_inr", "updated_at"])
+
+        return Response(
+            {
+                "message": f"Payment verified. Unlocked {credits} resume scan credit(s).",
                 "quota": quota.to_dict(),
             },
             status=status.HTTP_200_OK,

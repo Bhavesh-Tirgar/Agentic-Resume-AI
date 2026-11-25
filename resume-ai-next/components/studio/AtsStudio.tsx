@@ -18,6 +18,8 @@ import {
   getActiveResumeId,
   getResumeQuotaApi,
   unlockResumeCreditApi,
+  createRazorpayOrderApi,
+  verifyRazorpayPaymentApi,
   QuotaExceededError,
   ResumeQuotaInfo
 } from "@/lib/api";
@@ -303,10 +305,72 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
     e.target.value = "";
   };
 
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (typeof window !== "undefined" && (window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleUnlockCredit = async () => {
     setIsUnlocking(true);
     setUnlockError(null);
     try {
+      const order = await createRazorpayOrderApi(1);
+
+      if (order.mode === "razorpay" && order.key_id && order.order_id) {
+        const loaded = await loadRazorpayScript();
+        if (!loaded) {
+          throw new Error("Could not load Razorpay Checkout script.");
+        }
+        const RazorpayCtor = (window as any).Razorpay;
+        const rzp = new RazorpayCtor({
+          key: order.key_id,
+          amount: order.amount_paise,
+          currency: order.currency,
+          name: "CareerPilot AI",
+          description: "1 At-Cost Resume Scan Credit",
+          order_id: order.order_id,
+          handler: async (response: {
+            razorpay_order_id: string;
+            razorpay_payment_id: string;
+            razorpay_signature: string;
+          }) => {
+            try {
+              const verified = await verifyRazorpayPaymentApi({
+                ...response,
+                credits: order.credits,
+              });
+              setQuota(verified.quota);
+              setShowPaywallModal(false);
+              if (pendingUploadFile) {
+                const retryFile = pendingUploadFile;
+                setPendingUploadFile(null);
+                await processUploadedFile(retryFile);
+              }
+            } catch (verifyErr: any) {
+              setUnlockError(verifyErr.message || "Payment verification failed.");
+            } finally {
+              setIsUnlocking(false);
+            }
+          },
+          modal: {
+            ondismiss: () => setIsUnlocking(false),
+          },
+          theme: { color: "#10b981" },
+        });
+        rzp.open();
+        return;
+      }
+
+      // Sandbox fallback in local dev when RAZORPAY_KEY_ID is unset
       const unlockRes = await unlockResumeCreditApi(1);
       setQuota(unlockRes.quota);
       setShowPaywallModal(false);
@@ -315,9 +379,9 @@ export function AtsStudio({ onNavigateToMatch, onNavigateToInterview, onResumeUp
         setPendingUploadFile(null);
         await processUploadedFile(retryFile);
       }
+      setIsUnlocking(false);
     } catch (err: any) {
       setUnlockError(err.message || "Unlock failed.");
-    } finally {
       setIsUnlocking(false);
     }
   };

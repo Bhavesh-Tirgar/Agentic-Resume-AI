@@ -42,3 +42,18 @@ class UserResumeQuota(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.username}: free={self.free_resumes_used}/{self.free_limit()}, credits={self.paid_resume_credits}"
+
+
+class PaymentTransaction(models.Model):
+    """Idempotency ledger preventing duplicate credit minting for the same payment_id."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="payment_transactions")
+    provider = models.CharField(max_length=32, default="razorpay")
+    order_id = models.CharField(max_length=128)
+    payment_id = models.CharField(max_length=128, unique=True)
+    credits = models.PositiveIntegerField(default=1)
+    amount_inr = models.PositiveIntegerField(default=29)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return f"{self.user.username} | {self.provider}:{self.payment_id} (+{self.credits})"

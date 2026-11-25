@@ -134,3 +134,66 @@ class ResumeAppTests(TestCase):
         r3 = self.client.post(upload_url, {"resume_file": f3}, format="multipart")
         self.assertEqual(r3.status_code, status.HTTP_201_CREATED)
         self.assertEqual(r3.data["quota"]["paid_credits"], 0)
+
+    def test_razorpay_order_verify_and_replay_protection(self):
+        """Test Razorpay order creation, HMAC-SHA256 verification, tampered signature rejection, and replay guard."""
+        import hashlib
+        import hmac
+        import os
+        from unittest.mock import patch
+
+        order_url = reverse("resume-quota-order")
+        verify_url = reverse("resume-quota-verify")
+        secret = "rzp_test_secret_12345"
+
+        with patch.dict(os.environ, {"RAZORPAY_KEY_ID": "rzp_test_key", "RAZORPAY_KEY_SECRET": secret}):
+            with patch("Authentication.views.requests.post") as mock_post:
+                mock_post.return_value.status_code = 200
+                mock_post.return_value.json.return_value = {"id": "order_test_999", "amount": 2900, "currency": "INR"}
+                mock_post.return_value.raise_for_status.return_value = None
+
+                order_res = self.client.post(order_url, {"credits": 1}, format="json")
+                self.assertEqual(order_res.status_code, status.HTTP_200_OK)
+                self.assertEqual(order_res.data["mode"], "razorpay")
+                self.assertEqual(order_res.data["order_id"], "order_test_999")
+
+            # Tampered signature -> 402
+            bad_res = self.client.post(
+                verify_url,
+                {
+                    "razorpay_order_id": "order_test_999",
+                    "razorpay_payment_id": "pay_test_777",
+                    "razorpay_signature": "tampered_sig",
+                    "credits": 1,
+                },
+                format="json",
+            )
+            self.assertEqual(bad_res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+
+            # Valid Razorpay HMAC-SHA256 signature -> 200 and credits added
+            valid_sig = hmac.new(secret.encode(), b"order_test_999|pay_test_777", hashlib.sha256).hexdigest()
+            ok_res = self.client.post(
+                verify_url,
+                {
+                    "razorpay_order_id": "order_test_999",
+                    "razorpay_payment_id": "pay_test_777",
+                    "razorpay_signature": valid_sig,
+                    "credits": 1,
+                },
+                format="json",
+            )
+            self.assertEqual(ok_res.status_code, status.HTTP_200_OK)
+            self.assertEqual(ok_res.data["quota"]["paid_credits"], 1)
+
+            # Replay same payment_id -> 409 Conflict
+            replay_res = self.client.post(
+                verify_url,
+                {
+                    "razorpay_order_id": "order_test_999",
+                    "razorpay_payment_id": "pay_test_777",
+                    "razorpay_signature": valid_sig,
+                    "credits": 1,
+                },
+                format="json",
+            )
+            self.assertEqual(replay_res.status_code, status.HTTP_409_CONFLICT)
